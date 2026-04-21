@@ -26,6 +26,21 @@ Android MVP for interrupting habitual phone unlocks.
 4. In the app, enable the accessibility service.
 5. Optionally enable device admin if you want the app to re-lock the phone.
 
+## Debug release automation
+
+This repo includes a GitHub Actions workflow at [.github/workflows/android-debug.yml](.github/workflows/android-debug.yml).
+
+- Pushes to `main` build `app-debug.apk` and upload it as a workflow artifact.
+- Pull requests also build the debug APK for quick verification.
+- Pushing a tag like `v0.0.1-debug` builds the same debug APK and publishes it as a GitHub Release asset.
+
+Useful commands:
+
+```bash
+git tag v0.0.1-debug
+git push origin main --tags
+```
+
 ## Main behavior
 
 - `UnlockAccessibilityService` listens for `ACTION_USER_PRESENT` while running.
