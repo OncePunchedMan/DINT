@@ -26,7 +26,7 @@ enum class PresetTargetCategory(
     VIDEO("video", "Video", "Watch a video"),
     MUSIC("music", "Music and podcasts", "Play music or a podcast"),
     SHOPPING("shopping", "Shopping", "Shop for something"),
-    GAMES("gaming", "games", "Games", "Play a game"),
+    GAMES("games", "Games", "Play a game"),
 }
 
 fun queryLaunchableApps(context: Context): List<LaunchableApp> {

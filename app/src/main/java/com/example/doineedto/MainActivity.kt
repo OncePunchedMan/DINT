@@ -38,6 +38,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -827,6 +828,19 @@ private fun AppTargetChooserDialog(
     onDismiss: () -> Unit,
     onSelect: (LaunchableApp) -> Unit,
 ) {
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val normalizedQuery = searchQuery.trim()
+    val filteredApps = remember(apps, normalizedQuery) {
+        if (normalizedQuery.isBlank()) {
+            apps
+        } else {
+            val query = normalizedQuery.lowercase()
+            apps.filter { app ->
+                app.label.lowercase().contains(query) || app.packageName.lowercase().contains(query)
+            }
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("${stringResourceSafe(R.string.choose_app_dialog_title)}: ${category.title}") },
@@ -838,15 +852,30 @@ private fun AppTargetChooserDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                apps.forEach { app ->
-                    TextButton(
-                        onClick = { onSelect(app) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            text = app.label,
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResourceSafe(R.string.search_apps)) },
+                )
+
+                if (filteredApps.isEmpty()) {
+                    Text(
+                        text = stringResourceSafe(R.string.no_apps_match_search),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else {
+                    filteredApps.forEach { app ->
+                        TextButton(
+                            onClick = { onSelect(app) },
                             modifier = Modifier.fillMaxWidth(),
-                        )
+                        ) {
+                            Text(
+                                text = app.label,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
                 }
             }

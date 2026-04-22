@@ -32,6 +32,8 @@
     <string name="clear_app">Clear</string>
     <string name="no_app_selected">No app selected yet.</string>
     <string name="choose_app_dialog_title">Choose an app</string>
+    <string name="search_apps">Search apps</string>
+    <string name="no_apps_match_search">No installed apps match that search.</string>
     <string name="dismiss">Dismiss</string>
     <string name="app_target_memes_description">Useful for meme or quick dopamine presets.</string>
     <string name="app_target_social_description">Useful for broader social presets that are not tied to one app.</string>
