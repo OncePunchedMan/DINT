@@ -204,6 +204,9 @@ class AppPreferences(context: Context) {
         return AppTargetSelection(packageName = packageName, label = label)
     }
 
+    // TODO: When backup/import is added, preserve restored preset app mappings even if the app is
+    // missing on this phone, and surface a warning indicator so the user can see the mapping needs attention.
+
     fun setAppTargetSelection(category: PresetTargetCategory, selection: AppTargetSelection) {
         prefs.edit()
             .putString(appTargetPackageKey(category), selection.packageName)
