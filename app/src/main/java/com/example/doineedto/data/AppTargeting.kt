@@ -2,6 +2,7 @@ package com.example.doineedto.data
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.content.pm.PackageManager
 
 data class LaunchableApp(
@@ -32,7 +33,20 @@ fun queryLaunchableApps(context: Context): List<LaunchableApp> {
     val packageManager = context.packageManager
     val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
 
-    return packageManager.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL)
+    val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL.toLong())
+    } else {
+        null
+    }
+
+    val resolvedActivities = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        packageManager.queryIntentActivities(launcherIntent, flags!!)
+    } else {
+        @Suppress("DEPRECATION")
+        packageManager.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL)
+    }
+
+    return resolvedActivities
         .mapNotNull { resolveInfo ->
             val activityInfo = resolveInfo.activityInfo ?: return@mapNotNull null
             val packageName = activityInfo.packageName ?: return@mapNotNull null
@@ -46,6 +60,36 @@ fun queryLaunchableApps(context: Context): List<LaunchableApp> {
         }
         .distinctBy { it.packageName }
         .sortedBy { it.label.lowercase() }
+}
+
+private fun launchIntentForPackage(context: Context, packageName: String): Intent? {
+    val packageManager = context.packageManager
+
+    packageManager.getLaunchIntentForPackage(packageName)?.let { intent ->
+        return intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    val fallbackIntent = Intent(Intent.ACTION_MAIN).apply {
+        addCategory(Intent.CATEGORY_LAUNCHER)
+        `package` = packageName
+    }
+
+    val resolveInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        packageManager.resolveActivity(
+            fallbackIntent,
+            PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong())
+        )
+    } else {
+        @Suppress("DEPRECATION")
+        packageManager.resolveActivity(fallbackIntent, PackageManager.MATCH_DEFAULT_ONLY)
+    } ?: return null
+
+    val activityInfo = resolveInfo.activityInfo ?: return null
+    return Intent(Intent.ACTION_MAIN).apply {
+        addCategory(Intent.CATEGORY_LAUNCHER)
+        setClassName(activityInfo.packageName, activityInfo.name)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
 }
 
 fun launchIntentForReason(
@@ -67,9 +111,7 @@ fun launchIntentForReason(
     )
 
     explicitPackages[normalizedReason]?.let { packageName ->
-        return context.packageManager.getLaunchIntentForPackage(packageName)?.apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+        return launchIntentForPackage(context, packageName)
     }
 
     val category = PresetTargetCategory.entries.firstOrNull { preset ->
@@ -86,9 +128,7 @@ fun launchIntentForReason(
     }
 
     val mappedPackage = category?.let(appTargetSelection)?.packageName ?: return null
-    return context.packageManager.getLaunchIntentForPackage(mappedPackage)?.apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
+    return launchIntentForPackage(context, mappedPackage)
 }
 
 // TODO: Showing truly most-frequent apps as presets would need usage-based ranking or prediction logic,
