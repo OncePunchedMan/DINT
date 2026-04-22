@@ -11,7 +11,6 @@ import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -35,13 +35,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
 import com.example.doineedto.admin.FocusDeviceAdminReceiver
 import com.example.doineedto.data.AppPreferences
 import com.example.doineedto.data.ReasonValidator
 import com.example.doineedto.data.UnlockAction
+import com.example.doineedto.data.launchIntentForReason
 import com.example.doineedto.service.UnlockAccessibilityService
 import com.example.doineedto.ui.AppTheme
 import kotlin.math.roundToLong
@@ -131,6 +134,7 @@ class InterventionActivity : ComponentActivity() {
                         onContinue = {
                             decisionMade = true
                             preferences.completeLatestUnlock(reason, UnlockAction.CONTINUE)
+                            openAppForReasonIfPossible(reason, preferences)
                             finish()
                         },
                         onEmergencySkip = {
@@ -196,6 +200,16 @@ class InterventionActivity : ComponentActivity() {
         } else {
             dismissToHome()
         }
+    }
+
+    private fun openAppForReasonIfPossible(reason: String, preferences: AppPreferences) {
+        val launchIntent = launchIntentForReason(
+            context = this,
+            reason = reason,
+            appTargetSelection = preferences::getAppTargetSelection,
+        ) ?: return
+
+        startActivity(launchIntent)
     }
 
 companion object {
@@ -362,30 +376,39 @@ private fun InterventionScreen(
     }
 }
 
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @androidx.compose.runtime.Composable
 private fun PromptTitle(onEmergencySkip: () -> Unit) {
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
-        verticalArrangement = Arrangement.spacedBy(0.dp),
-    ) {
-        Text(
-            text = "Why are you opening your phone right ",
-            style = MaterialTheme.typography.headlineMedium
+    val emergencyTag = "emergency_skip"
+    val promptTitle = buildAnnotatedString {
+        append("Why are you opening your phone right ")
+        pushStringAnnotation(tag = emergencyTag, annotation = emergencyTag)
+        pushStyle(
+            SpanStyle(
+                color = MaterialTheme.colorScheme.tertiary,
+                fontWeight = FontWeight.SemiBold,
+            )
         )
-        Text(
-            text = "now",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.tertiary,
-            textDecoration = TextDecoration.Underline,
-            modifier = Modifier.clickable(onClick = onEmergencySkip)
-        )
-        Text(
-            text = "?",
-            style = MaterialTheme.typography.headlineMedium
-        )
+        append("now")
+        pop()
+        pop()
+        append("?")
     }
+
+    ClickableText(
+        text = promptTitle,
+        style = MaterialTheme.typography.headlineMedium.copy(
+            color = MaterialTheme.colorScheme.onBackground
+        ),
+        onClick = { offset ->
+            promptTitle.getStringAnnotations(
+                tag = emergencyTag,
+                start = offset,
+                end = offset,
+            ).firstOrNull()?.let {
+                onEmergencySkip()
+            }
+        }
+    )
 }
 
 private fun visibleContinueReasons(showMore: Boolean): List<String> =
@@ -401,6 +424,8 @@ private val continueReasons = listOf(
     "Look something up",
     "Use the camera",
     "Check directions",
+    "Catch up on social media",
+    "Look at memes",
     "Open Instagram",
     "Open TikTok",
     "Open YouTube",
@@ -412,10 +437,18 @@ private val continueReasons = listOf(
     "Check my bank",
     "Read the news",
     "Read something",
+    "Watch a video",
     "Check the weather",
     "Use notes or tasks",
     "Shop for something",
     "Play a game",
+    "Use two-factor authentication",
+    "Scan a code",
+    "Check a delivery",
+    "Order food",
+    "Pay for something",
+    "Read a document",
+    "Join a call",
     "Something else",
 )
 
@@ -439,6 +472,8 @@ private val mergedReasons = listOf(
     "Use the camera",
     "I am bored",
     "Check directions",
+    "Catch up on social media",
+    "Look at memes",
     "Open Instagram",
     "I want to check Instagram",
     "Open TikTok",
@@ -452,11 +487,19 @@ private val mergedReasons = listOf(
     "Check email",
     "Check my bank",
     "Read the news",
+    "Watch a video",
     "Read something",
     "Check the weather",
     "Use notes or tasks",
     "Shop for something",
     "Play a game",
+    "Use two-factor authentication",
+    "Scan a code",
+    "Check a delivery",
+    "Order food",
+    "Pay for something",
+    "Read a document",
+    "Join a call",
     "I just want dopamine",
     "Something else",
 )

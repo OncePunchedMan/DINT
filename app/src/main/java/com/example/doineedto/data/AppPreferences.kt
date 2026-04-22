@@ -198,6 +198,26 @@ class AppPreferences(context: Context) {
 
     fun keptLockedUnlocks(): Int = getUnlockLogs().count { it.action == UnlockAction.KEEP_LOCKED.value }
 
+    fun getAppTargetSelection(category: PresetTargetCategory): AppTargetSelection? {
+        val packageName = prefs.getString(appTargetPackageKey(category), null) ?: return null
+        val label = prefs.getString(appTargetLabelKey(category), null) ?: return null
+        return AppTargetSelection(packageName = packageName, label = label)
+    }
+
+    fun setAppTargetSelection(category: PresetTargetCategory, selection: AppTargetSelection) {
+        prefs.edit()
+            .putString(appTargetPackageKey(category), selection.packageName)
+            .putString(appTargetLabelKey(category), selection.label)
+            .apply()
+    }
+
+    fun clearAppTargetSelection(category: PresetTargetCategory) {
+        prefs.edit()
+            .remove(appTargetPackageKey(category))
+            .remove(appTargetLabelKey(category))
+            .apply()
+    }
+
     private fun appendUnlockLog(entry: UnlockLogEntry) {
         val updated = (getUnlockLogs() + entry).sortedByDescending { it.timestamp }.take(MAX_LOG_ENTRIES)
         saveUnlockLogs(updated)
@@ -237,6 +257,12 @@ class AppPreferences(context: Context) {
         private const val MAX_WAIT_MILLIS = 12_000L
         private const val MAX_LOG_ENTRIES = 200
         private const val RECENT_REASON_WINDOW = 20
+
+        private fun appTargetPackageKey(category: PresetTargetCategory): String =
+            "app_target_${category.key}_package"
+
+        private fun appTargetLabelKey(category: PresetTargetCategory): String =
+            "app_target_${category.key}_label"
     }
 }
 
