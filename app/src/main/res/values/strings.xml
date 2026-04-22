@@ -4,7 +4,7 @@
     <string name="home_title">Dint - Do I Need To?</string>
     <string name="main_intro">Dint helps you pause before you unlock your phone. It asks what you are about to do, so you can use your phone with intention instead of opening it out of boredom, impulse, or habit.</string>
     <string name="home_why_title">Why use Dint?</string>
-    <string name="home_why_body">Most screen-time tools step in after you are already using your phone. Dint steps in earlier, right at unlock, when the habit usually starts. The goal is not guilt or punishment. It is to make the moment conscious enough that you can choose what happens next.</string>
+    <string name="home_why_body">Most screen-time tools step in after you are already using your phone. Dint steps in earlier, right at unlock, when the habit usually starts. The goal is not guilt or punishment. It is to make the moment conscious enough that you can choose what happens next and self reflect on your intention.</string>
     <string name="emergency_title">Emergency note</string>
     <string name="emergency_body">Dint is not meant to block urgent access. If you need your phone right away for safety, health, travel, or another real-world need, use the emergency skip ("NOW") and keep moving.</string>
     <string name="onboarding_title">Welcome to Dint</string>
