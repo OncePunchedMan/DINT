@@ -530,6 +530,28 @@ private fun HomeTab(
             )
         }
         item {
+            SettingsGroup(
+                title = stringResourceSafe(R.string.home_why_title),
+                content = {
+                    ListItem(
+                        headlineContent = { Text(stringResourceSafe(R.string.home_why_title)) },
+                        supportingContent = { Text(stringResourceSafe(R.string.home_why_body)) }
+                    )
+                }
+            )
+        }
+        item {
+            SettingsGroup(
+                title = stringResourceSafe(R.string.emergency_title),
+                content = {
+                    ListItem(
+                        headlineContent = { Text(stringResourceSafe(R.string.emergency_title)) },
+                        supportingContent = { Text(stringResourceSafe(R.string.emergency_body)) }
+                    )
+                }
+            )
+        }
+        item {
             StatsSection(
                 totalUnlocks = historyState.totalUnlocks,
                 continuedUnlocks = historyState.continuedUnlocks,
@@ -1226,6 +1248,9 @@ private fun StatsSection(
     keptLockedUnlocks: Int,
     dailyCounts: List<DailyUnlockCount>,
 ) {
+    var showAllDays by rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val visibleDailyCounts = if (showAllDays) dailyCounts else dailyCounts.take(3)
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             text = stringResourceSafe(R.string.stats_title),
@@ -1244,7 +1269,7 @@ private fun StatsSection(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                dailyCounts.forEach { day ->
+                visibleDailyCounts.forEach { day ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1252,6 +1277,19 @@ private fun StatsSection(
                     ) {
                         Text(day.label, style = MaterialTheme.typography.bodyMedium)
                         Text("${day.count}", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                if (dailyCounts.size > 3 && !showAllDays) {
+                    Button(
+                        onClick = { showAllDays = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    ) {
+                        Text(stringResourceSafe(R.string.show_more_days))
                     }
                 }
             }
