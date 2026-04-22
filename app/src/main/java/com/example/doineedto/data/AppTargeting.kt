@@ -26,7 +26,7 @@ enum class PresetTargetCategory(
     VIDEO("video", "Video", "Watch a video"),
     MUSIC("music", "Music and podcasts", "Play music or a podcast"),
     SHOPPING("shopping", "Shopping", "Shop for something"),
-    GAMES("games", "Games", "Play a game"),
+    GAMES("gaming", "games", "Games", "Play a game"),
 }
 
 fun queryLaunchableApps(context: Context): List<LaunchableApp> {
@@ -108,6 +108,23 @@ fun launchIntentForReason(
         "open youtube" to "com.google.android.youtube",
         "check reddit" to "com.reddit.frontpage",
         "open reddit" to "com.reddit.frontpage",
+        "open gmail" to "com.google.android.gm",
+        "check gmail" to "com.google.android.gm",
+        "open outlook" to "com.microsoft.office.outlook",
+        "check outlook" to "com.microsoft.office.outlook",
+        "outlook" to "com.microsoft.office.outlook",
+        "open protonmail" to "ch.protonmail.android",
+        "check protonmail" to "ch.protonmail.android",
+        "open spotify" to "com.spotify.music",
+        "play spotify" to "com.spotify.music",
+        "spotify" to "com.spotify.music",
+        "listen to music" to "com.spotify.music",
+        "play music" to "com.spotify.music",
+        "open podcasts" to "com.spotify.music",
+        "listen to podcasts" to "com.spotify.music",
+        "open amazon" to "com.amazon.mShop.android.shopping",
+        "shop on amazon" to "com.amazon.mShop.android.shopping",
+        "open amazon shopping" to "com.amazon.mShop.android.shopping",
     )
 
     explicitPackages[normalizedReason]?.let { packageName ->

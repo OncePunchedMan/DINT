@@ -12,13 +12,13 @@ object ReasonValidator {
         "linkedin", "gmail", "chrome", "safari", "netflix", "prime", "shopping", "amazon",
         "ebay", "shein", "zara", "doomscroll", "scroll", "feed", "reels", "shorts",
         "bored", "habit", "impulse", "curious", "curiosity", "waste", "timepass",
-        "lurking", "meme", "memes", "game", "gaming", "chat", "dm", "post", "story"
+        "meme", "memes", "game", "gaming", "chat", "dm", "post", "story"
     )
 
     private val distractionKeywords = setOf(
         "instagram", "insta", "tiktok", "twitter", "x", "reddit", "youtube", "snapchat",
         "facebook", "scroll", "doomscroll", "feed", "reels", "shorts", "bored", "habit",
-        "impulse", "dopamine", "meme", "memes", "lurking", "game", "gaming"
+        "impulse", "dopamine", "meme", "memes", "game", "gaming"
     )
 
     fun isReasonValid(reason: String, curatedReasons: Set<String>): Boolean {

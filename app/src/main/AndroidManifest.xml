@@ -15,6 +15,12 @@
         <package android:name="com.instagram.android" />
         <package android:name="com.zhiliaoapp.musically" />
         <package android:name="com.reddit.frontpage" />
+        <package android:name="com.google.android.gm" />
+        <package android:name="com.microsoft.office.outlook" />
+        <package android:name="ch.protonmail.android" />
+        <package android:name="com.spotify.music" />
+        <package android:name="com.aspiro.tidal" />
+        <package android:name="com.amazon.mShop.android.shopping" />
     </queries>
 
     <application

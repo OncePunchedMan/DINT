@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -33,11 +35,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
 import com.example.doineedto.admin.FocusDeviceAdminReceiver
@@ -47,6 +53,7 @@ import com.example.doineedto.data.UnlockAction
 import com.example.doineedto.data.launchIntentForReason
 import com.example.doineedto.service.UnlockAccessibilityService
 import com.example.doineedto.ui.AppTheme
+import kotlinx.coroutines.launch
 import kotlin.math.roundToLong
 
 class InterventionActivity : ComponentActivity() {
@@ -242,6 +249,10 @@ private fun InterventionScreen(
     val allCuratedReasons = remember(continueReasons, keepLockedReasons) {
         (continueReasons + keepLockedReasons).toSet()
     }
+    val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val isReasonValid = remember(reason, allCuratedReasons) {
         ReasonValidator.isReasonValid(reason, allCuratedReasons)
     }
@@ -257,7 +268,7 @@ private fun InterventionScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Column(
-            modifier = Modifier.verticalScroll(rememberScrollState()),
+            modifier = Modifier.verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             PromptTitle(onEmergencySkip = onEmergencySkip)
@@ -281,6 +292,9 @@ private fun InterventionScreen(
                                     onKeepLockedReasonSelected(option)
                                 } else {
                                     onCuratedReasonSelected(option)
+                                    coroutineScope.launch {
+                                        scrollState.animateScrollTo(scrollState.maxValue)
+                                    }
                                 }
                             },
                             label = { Text(option) }
@@ -303,7 +317,12 @@ private fun InterventionScreen(
                 ) {
                     visibleContinueReasons(showMoreContinueReasons).forEach { option ->
                         SuggestionChip(
-                            onClick = { onCuratedReasonSelected(option) },
+                            onClick = {
+                                onCuratedReasonSelected(option)
+                                coroutineScope.launch {
+                                    scrollState.animateScrollTo(scrollState.maxValue)
+                                }
+                            },
                             label = { Text(option) }
                         )
                     }
@@ -335,7 +354,15 @@ private fun InterventionScreen(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Your reason") },
                 placeholder = { Text("Message someone, check a map, take a photo...") },
-                minLines = 2,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        // TODO: Make Enter-to-submit optional behind a user setting.
+                        keyboardController?.hide()
+                        focusManager.clearFocus()
+                    }
+                ),
                 isError = reason.isNotBlank() && (!isReasonValid || isRepeatedDistractionReason),
                 supportingText = {
                     if (reason.isNotBlank() && isRepeatedDistractionReason) {
