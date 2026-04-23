@@ -57,24 +57,33 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.example.doineedto.admin.FocusDeviceAdminReceiver
 import com.example.doineedto.data.AppPreferences
 import com.example.doineedto.data.AppTargetSelection
+import com.example.doineedto.data.AppUpdate
+import com.example.doineedto.data.AppUpdateManager
 import com.example.doineedto.data.DailyUnlockCount
 import com.example.doineedto.data.LaunchableApp
 import com.example.doineedto.data.PresetTargetCategory
 import com.example.doineedto.data.ScheduleWindow
 import com.example.doineedto.data.UnlockLogEntry
 import com.example.doineedto.data.queryLaunchableApps
+import com.example.doineedto.data.UpdateCheckResult
 import com.example.doineedto.service.UnlockAccessibilityService
 import com.example.doineedto.ui.AppTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private lateinit var preferences: AppPreferences
+    private lateinit var updateManager: AppUpdateManager
     private var uiState by mutableStateOf(MainUiState())
+    private var updateUiState by mutableStateOf(UpdateUiState())
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -85,6 +94,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         preferences = AppPreferences(this)
+        updateManager = AppUpdateManager(this)
         refreshUiState()
 
         setContent {
@@ -124,6 +134,10 @@ class MainActivity : ComponentActivity() {
                         },
                         isDeviceAdminEnabled = uiState.isDeviceAdminEnabled,
                         refreshToken = uiState.refreshToken,
+                        updateUiState = updateUiState,
+                        onCheckForUpdate = { checkForUpdate() },
+                        onInstallUpdate = { installUpdate() },
+                        onOpenInstallSettings = { updateManager.openUnknownAppSourcesSettings() },
                     )
                 }
             }
@@ -192,6 +206,59 @@ class MainActivity : ComponentActivity() {
     private fun appVersionName(): String {
         val info = packageManager.getPackageInfo(packageName, 0)
         return info.versionName ?: "1.0"
+    }
+
+    private fun checkForUpdate() {
+        updateUiState = updateUiState.copy(isChecking = true, message = null)
+
+        lifecycleScope.launch {
+            updateUiState = try {
+                when (val result = withContext(Dispatchers.IO) { updateManager.checkForUpdate() }) {
+                    is UpdateCheckResult.Available -> UpdateUiState(
+                        availableUpdate = result.update,
+                        message = getString(R.string.update_available_message, result.update.versionName),
+                    )
+
+                    UpdateCheckResult.UpToDate -> UpdateUiState(
+                        message = getString(R.string.update_up_to_date),
+                    )
+                }
+            } catch (error: Exception) {
+                UpdateUiState(message = getString(R.string.update_check_failed, error.readableMessage()))
+            }
+        }
+    }
+
+    private fun installUpdate() {
+        val update = updateUiState.availableUpdate ?: return
+
+        if (!updateManager.canRequestPackageInstalls()) {
+            updateUiState = updateUiState.copy(
+                message = getString(R.string.update_install_permission_needed),
+            )
+            updateManager.openUnknownAppSourcesSettings()
+            return
+        }
+
+        updateUiState = updateUiState.copy(isInstalling = true, message = getString(R.string.update_downloading))
+
+        lifecycleScope.launch {
+            try {
+                val apkFile = withContext(Dispatchers.IO) {
+                    updateManager.downloadUpdateApk(update)
+                }
+                updateManager.promptInstall(apkFile)
+                updateUiState = updateUiState.copy(
+                    isInstalling = false,
+                    message = getString(R.string.update_install_prompt_opened),
+                )
+            } catch (error: Exception) {
+                updateUiState = updateUiState.copy(
+                    isInstalling = false,
+                    message = getString(R.string.update_install_failed, error.readableMessage()),
+                )
+            }
+        }
     }
 
     private fun isAccessibilityEnabled(): Boolean {
@@ -289,6 +356,10 @@ private fun MainScreen(
     onPreviewIntervention: () -> Unit,
     isDeviceAdminEnabled: Boolean,
     refreshToken: Int,
+    updateUiState: UpdateUiState,
+    onCheckForUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
+    onOpenInstallSettings: () -> Unit,
 ) {
     var onboardingCompleted by rememberSaveable(hasCompletedOnboarding) {
         androidx.compose.runtime.mutableStateOf(hasCompletedOnboarding)
@@ -410,6 +481,10 @@ private fun MainScreen(
                 onLockNow = onLockNow,
                 onPreviewIntervention = onPreviewIntervention,
                 refreshToken = refreshToken,
+                updateUiState = updateUiState,
+                onCheckForUpdate = onCheckForUpdate,
+                onInstallUpdate = onInstallUpdate,
+                onOpenInstallSettings = onOpenInstallSettings,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
@@ -622,6 +697,10 @@ private fun MoreTab(
     onLockNow: () -> Unit,
     onPreviewIntervention: () -> Unit,
     refreshToken: Int,
+    updateUiState: UpdateUiState,
+    onCheckForUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
+    onOpenInstallSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -671,6 +750,19 @@ private fun MoreTab(
                 title = stringResourceSafe(R.string.app_targets_title),
                 content = {
                     AppLaunchTargetsSection(refreshToken = refreshToken)
+                }
+            )
+        }
+        item {
+            SettingsGroup(
+                title = stringResourceSafe(R.string.updates_title),
+                content = {
+                    AppUpdateSection(
+                        state = updateUiState,
+                        onCheckForUpdate = onCheckForUpdate,
+                        onInstallUpdate = onInstallUpdate,
+                        onOpenInstallSettings = onOpenInstallSettings,
+                    )
                 }
             )
         }
@@ -898,6 +990,71 @@ private fun appTargetDescription(category: PresetTargetCategory): String = when 
     PresetTargetCategory.MUSIC -> stringResourceSafe(R.string.app_target_music_description)
     PresetTargetCategory.SHOPPING -> stringResourceSafe(R.string.app_target_shopping_description)
     PresetTargetCategory.GAMES -> stringResourceSafe(R.string.app_target_games_description)
+}
+
+@Composable
+private fun AppUpdateSection(
+    state: UpdateUiState,
+    onCheckForUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
+    onOpenInstallSettings: () -> Unit,
+) {
+    Column {
+        ListItem(
+            headlineContent = { Text(stringResourceSafe(R.string.updates_title)) },
+            supportingContent = {
+                Text(state.message ?: stringResourceSafe(R.string.updates_description))
+            },
+            trailingContent = {
+                Button(
+                    onClick = onCheckForUpdate,
+                    enabled = !state.isChecking && !state.isInstalling,
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Text(
+                        stringResourceSafe(
+                            if (state.isChecking) R.string.update_checking else R.string.check_for_update
+                        )
+                    )
+                }
+            }
+        )
+
+        state.availableUpdate?.let { update ->
+            HorizontalDivider()
+            ListItem(
+                headlineContent = {
+                    Text(
+                        stringResourceSafe(R.string.update_available_title, update.versionName),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                },
+                supportingContent = {
+                    Text(stringResourceSafe(R.string.update_available_asset, update.apkName))
+                },
+                trailingContent = {
+                    Button(
+                        onClick = onInstallUpdate,
+                        enabled = !state.isChecking && !state.isInstalling,
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Text(
+                            stringResourceSafe(
+                                if (state.isInstalling) R.string.update_downloading_short else R.string.install_update
+                            )
+                        )
+                    }
+                }
+            )
+            HorizontalDivider()
+            ActionRow(
+                title = stringResourceSafe(R.string.update_install_permission_title),
+                subtitle = stringResourceSafe(R.string.update_install_permission_description),
+                buttonLabel = stringResourceSafe(R.string.open_settings),
+                onClick = onOpenInstallSettings,
+            )
+        }
+    }
 }
 
 @Composable
@@ -1418,6 +1575,13 @@ private data class MainUiState(
     val refreshToken: Int = 0,
 )
 
+private data class UpdateUiState(
+    val isChecking: Boolean = false,
+    val isInstalling: Boolean = false,
+    val availableUpdate: AppUpdate? = null,
+    val message: String? = null,
+)
+
 private fun frictionDescription(friction: Int): String = when {
     friction < 25 -> "Light pause: a quick reflection and a short wait."
     friction < 50 -> "Balanced pause: enough time to notice the urge."
@@ -1434,3 +1598,9 @@ private fun formatMinutes(minutes: Int): String {
 
 @Composable
 private fun stringResourceSafe(id: Int): String = androidx.compose.ui.res.stringResource(id)
+
+@Composable
+private fun stringResourceSafe(id: Int, vararg formatArgs: Any): String =
+    androidx.compose.ui.res.stringResource(id, *formatArgs)
+
+private fun Throwable.readableMessage(): String = localizedMessage ?: javaClass.simpleName
