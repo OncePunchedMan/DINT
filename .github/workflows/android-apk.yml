@@ -1,0 +1,77 @@
+name: Android APK
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Optional release tag, for example v0.0.2"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-debug-apk:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Restore signing key
+        run: |
+          if [ -n "$DINT_KEYSTORE_BASE64" ]; then
+            echo "$DINT_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/dint-upload.jks"
+            echo "DINT_KEYSTORE_FILE=$RUNNER_TEMP/dint-upload.jks" >> "$GITHUB_ENV"
+          fi
+        env:
+          DINT_KEYSTORE_BASE64: ${{ secrets.DINT_KEYSTORE_BASE64 }}
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug
+        env:
+          DINT_VERSION_CODE: ${{ github.run_number }}
+          DINT_VERSION_NAME: 0.0.1.${{ github.run_number }}
+          DINT_KEYSTORE_PASSWORD: ${{ secrets.DINT_KEYSTORE_PASSWORD }}
+          DINT_KEY_ALIAS: ${{ secrets.DINT_KEY_ALIAS }}
+          DINT_KEY_PASSWORD: ${{ secrets.DINT_KEY_PASSWORD }}
+
+      - name: Rename APK
+        run: |
+          mkdir -p release
+          cp app/build/outputs/apk/debug/app-debug.apk release/Dint-debug.apk
+
+      - name: Upload branch APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dint-debug-${{ github.run_number }}
+          path: release/Dint-debug.apk
+
+      - name: Create GitHub release on master
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' }}
+        run: |
+          VERSION_NAME="0.0.1.${GITHUB_RUN_NUMBER}"
+          VERSION_CODE="${GITHUB_RUN_NUMBER}"
+          TAG="${{ inputs.release_tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="v${VERSION_NAME}"
+          fi
+
+          gh release create "$TAG" release/Dint-debug.apk \
+            --title "Dint ${TAG}" \
+            --notes "Automated APK from ${GITHUB_SHA}. Version ${VERSION_NAME} (${VERSION_CODE})."
+        env:
+          GH_TOKEN: ${{ github.token }}
