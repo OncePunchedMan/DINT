@@ -129,10 +129,11 @@ class AppPreferences(context: Context) {
         val normalizedReason = ReasonValidator.normalizeReason(reason)
         if (normalizedReason.isBlank()) return false
 
+        val cutoff = System.currentTimeMillis() - REPEATED_REASON_COOLDOWN_MILLIS
         val recentMatches = getUnlockLogs()
             .asSequence()
             .filter { it.action != UnlockAction.PENDING.value }
-            .take(RECENT_REASON_WINDOW)
+            .filter { it.timestamp >= cutoff }
             .count { entry ->
                 ReasonValidator.normalizeReason(entry.reason) == normalizedReason
             }
@@ -236,7 +237,7 @@ class AppPreferences(context: Context) {
         private const val KEY_HAS_COMPLETED_ONBOARDING = "has_completed_onboarding"
         private const val MAX_WAIT_MILLIS = 12_000L
         private const val MAX_LOG_ENTRIES = 200
-        private const val RECENT_REASON_WINDOW = 20
+        private const val REPEATED_REASON_COOLDOWN_MILLIS = 3 * 60 * 60 * 1000L
     }
 }
 
