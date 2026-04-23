@@ -101,6 +101,11 @@ class AppPreferences(context: Context) {
         prefs.edit().putLong(KEY_PENDING_UNLOCK_AT, 0L).apply()
     }
 
+    fun clearPendingUnlockLog() {
+        val updated = getUnlockLogs().filterNot { it.action == UnlockAction.PENDING.value }
+        saveUnlockLogs(updated)
+    }
+
     fun shouldCooldownIntervention(cooldownMillis: Long = 5_000L): Boolean {
         val lastInterventionAt = prefs.getLong(KEY_LAST_INTERVENTION_AT, 0L)
         return (System.currentTimeMillis() - lastInterventionAt) < cooldownMillis
