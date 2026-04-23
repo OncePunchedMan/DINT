@@ -2,6 +2,7 @@ package com.example.doineedto.data
 
 import android.content.Context
 import android.content.Intent
+import android.provider.MediaStore
 import android.os.Build
 import android.content.pm.PackageManager
 
@@ -100,6 +101,8 @@ fun launchIntentForReason(
     val normalizedReason = reason.trim().lowercase()
     if (normalizedReason.isBlank()) return null
 
+    defaultIntentForReason(context, normalizedReason)?.let { return it }
+
     val explicitPackages = mapOf(
         "open instagram" to "com.instagram.android",
         "i want to check instagram" to "com.instagram.android",
@@ -146,6 +149,45 @@ fun launchIntentForReason(
 
     val mappedPackage = category?.let(appTargetSelection)?.packageName ?: return null
     return launchIntentForPackage(context, mappedPackage)
+}
+
+private fun defaultIntentForReason(context: Context, normalizedReason: String): Intent? {
+    val intent = when {
+        normalizedReason == "use the camera" ||
+            normalizedReason == "open camera" ||
+            "camera" in normalizedReason -> {
+            Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
+        }
+
+        normalizedReason == "open gallery" ||
+            normalizedReason == "open photos" ||
+            normalizedReason == "view photos" ||
+            normalizedReason == "view gallery" ||
+            "gallery" in normalizedReason ||
+            "photos" in normalizedReason -> {
+            Intent(
+                Intent.ACTION_VIEW,
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            ).apply {
+                type = "image/*"
+            }
+        }
+
+        else -> null
+    } ?: return null
+
+    val packageManager = context.packageManager
+    val canResolve = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        packageManager.resolveActivity(
+            intent,
+            PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong())
+        ) != null
+    } else {
+        @Suppress("DEPRECATION")
+        packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY) != null
+    }
+
+    return intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).takeIf { canResolve }
 }
 
 // TODO: Showing truly most-frequent apps as presets would need usage-based ranking or prediction logic,
