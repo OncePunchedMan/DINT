@@ -70,7 +70,13 @@ class AppUpdateManager(private val context: Context) {
     }
 
     private fun fetchLatestRelease(): AppUpdate {
-        val json = httpGet("$GITHUB_API_BASE/releases/latest")
+        val json = try {
+            httpGet("$GITHUB_API_BASE/releases/latest")
+        } catch (error: GitHubNotFoundException) {
+            throw UpdateUnavailableException(
+                "No public GitHub release is available. If the repository is private, in-app updates cannot read its releases without authentication.",
+            )
+        }
         val release = JSONObject(json)
         val assets = release.getJSONArray("assets")
 
@@ -124,6 +130,10 @@ class AppUpdateManager(private val context: Context) {
         if (responseCode !in 200..299) {
             val message = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
             connection.disconnect()
+            if (responseCode == HTTP_NOT_FOUND) {
+                throw GitHubNotFoundException()
+            }
+
             error("GitHub request failed: $responseCode $message")
         }
 
@@ -137,8 +147,13 @@ class AppUpdateManager(private val context: Context) {
     companion object {
         private const val GITHUB_API_BASE = "https://api.github.com/repos/OncePunchedMan/DINT"
         private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
+        private const val HTTP_NOT_FOUND = 404
     }
 }
+
+class UpdateUnavailableException(message: String) : Exception(message)
+
+private class GitHubNotFoundException : Exception()
 
 private fun isNewerVersion(candidate: String, current: String): Boolean {
     val candidateParts = candidate.versionParts()
