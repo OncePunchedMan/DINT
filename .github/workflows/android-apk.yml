@@ -40,8 +40,11 @@ jobs:
         env:
           DINT_KEYSTORE_BASE64: ${{ secrets.DINT_KEYSTORE_BASE64 }}
 
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
       - name: Build debug APK
-        run: ./gradlew :app:assembleDebug
+        run: bash ./gradlew :app:assembleDebug
         env:
           DINT_VERSION_CODE: ${{ github.run_number }}
           DINT_VERSION_NAME: 0.0.1.${{ github.run_number }}
