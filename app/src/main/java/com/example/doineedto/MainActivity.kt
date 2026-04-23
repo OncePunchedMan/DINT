@@ -21,24 +21,30 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -54,11 +60,15 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.doineedto.admin.FocusDeviceAdminReceiver
 import com.example.doineedto.data.AppPreferences
+import com.example.doineedto.data.AppTargetSelection
 import com.example.doineedto.data.AppUpdate
 import com.example.doineedto.data.AppUpdateManager
 import com.example.doineedto.data.DailyUnlockCount
+import com.example.doineedto.data.LaunchableApp
+import com.example.doineedto.data.PresetTargetCategory
 import com.example.doineedto.data.ScheduleWindow
 import com.example.doineedto.data.UnlockLogEntry
+import com.example.doineedto.data.queryLaunchableApps
 import com.example.doineedto.data.UpdateCheckResult
 import com.example.doineedto.service.UnlockAccessibilityService
 import com.example.doineedto.ui.AppTheme
@@ -470,6 +480,7 @@ private fun MainScreen(
                 isDeviceAdminEnabled = isDeviceAdminEnabled,
                 onLockNow = onLockNow,
                 onPreviewIntervention = onPreviewIntervention,
+                refreshToken = refreshToken,
                 updateUiState = updateUiState,
                 onCheckForUpdate = onCheckForUpdate,
                 onInstallUpdate = onInstallUpdate,
@@ -685,6 +696,7 @@ private fun MoreTab(
     isDeviceAdminEnabled: Boolean,
     onLockNow: () -> Unit,
     onPreviewIntervention: () -> Unit,
+    refreshToken: Int,
     updateUiState: UpdateUiState,
     onCheckForUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
@@ -730,6 +742,14 @@ private fun MoreTab(
                         buttonLabel = stringResourceSafe(R.string.preview_intervention),
                         onClick = onPreviewIntervention,
                     )
+                }
+            )
+        }
+        item {
+            SettingsGroup(
+                title = stringResourceSafe(R.string.app_targets_title),
+                content = {
+                    AppLaunchTargetsSection(refreshToken = refreshToken)
                 }
             )
         }
@@ -802,6 +822,174 @@ private fun AboutCard(appVersionName: String) {
             supportingContent = { Text(stringResourceSafe(R.string.about_author_value)) }
         )
     }
+}
+
+@Composable
+private fun AppLaunchTargetsSection(
+    refreshToken: Int,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val preferences = remember(context) { AppPreferences(context) }
+    var chooserCategory by rememberSaveable { mutableStateOf<PresetTargetCategory?>(null) }
+    var localRefreshToken by rememberSaveable { mutableIntStateOf(0) }
+    val launchableApps = remember(refreshToken, localRefreshToken) { queryLaunchableApps(context) }
+
+    Column {
+        ListItem(
+            headlineContent = { Text(stringResourceSafe(R.string.app_targets_title)) },
+            supportingContent = { Text(stringResourceSafe(R.string.app_targets_description)) }
+        )
+
+        PresetTargetCategory.entries.forEachIndexed { index, category ->
+            if (index > 0) {
+                HorizontalDivider()
+            }
+
+            val selection = preferences.getAppTargetSelection(category)
+
+            AppTargetRow(
+                category = category,
+                selection = selection,
+                onChoose = { chooserCategory = category },
+                onClear = {
+                    preferences.clearAppTargetSelection(category)
+                    localRefreshToken += 1
+                }
+            )
+        }
+    }
+
+    if (chooserCategory != null) {
+        AppTargetChooserDialog(
+            category = chooserCategory!!,
+            apps = launchableApps,
+            onDismiss = { chooserCategory = null },
+            onSelect = { app ->
+                preferences.setAppTargetSelection(
+                    chooserCategory!!,
+                    AppTargetSelection(
+                        packageName = app.packageName,
+                        label = app.label,
+                    )
+                )
+                localRefreshToken += 1
+                chooserCategory = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun AppTargetRow(
+    category: PresetTargetCategory,
+    selection: AppTargetSelection?,
+    onChoose: () -> Unit,
+    onClear: () -> Unit,
+) {
+    ListItem(
+        headlineContent = { Text(category.title) },
+        supportingContent = {
+            Text(selection?.label ?: appTargetDescription(category))
+        },
+        trailingContent = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (selection != null) {
+                    TextButton(onClick = onClear) {
+                        Text(stringResourceSafe(R.string.clear_app))
+                    }
+                }
+                Button(
+                    onClick = onChoose,
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Text(
+                        stringResourceSafe(
+                            if (selection == null) R.string.choose_app else R.string.change_app
+                        )
+                    )
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun AppTargetChooserDialog(
+    category: PresetTargetCategory,
+    apps: List<LaunchableApp>,
+    onDismiss: () -> Unit,
+    onSelect: (LaunchableApp) -> Unit,
+) {
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val normalizedQuery = searchQuery.trim()
+    val filteredApps = remember(apps, normalizedQuery) {
+        if (normalizedQuery.isBlank()) {
+            apps
+        } else {
+            val query = normalizedQuery.lowercase()
+            apps.filter { app ->
+                app.label.lowercase().contains(query) || app.packageName.lowercase().contains(query)
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("${stringResourceSafe(R.string.choose_app_dialog_title)}: ${category.title}") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResourceSafe(R.string.search_apps)) },
+                )
+
+                if (filteredApps.isEmpty()) {
+                    Text(
+                        text = stringResourceSafe(R.string.no_apps_match_search),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else {
+                    filteredApps.forEach { app ->
+                        TextButton(
+                            onClick = { onSelect(app) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = app.label,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResourceSafe(R.string.dismiss))
+            }
+        }
+    )
+}
+
+@Composable
+private fun appTargetDescription(category: PresetTargetCategory): String = when (category) {
+    PresetTargetCategory.MEMES -> stringResourceSafe(R.string.app_target_memes_description)
+    PresetTargetCategory.SOCIAL -> stringResourceSafe(R.string.app_target_social_description)
+    PresetTargetCategory.NEWS -> stringResourceSafe(R.string.app_target_news_description)
+    PresetTargetCategory.VIDEO -> stringResourceSafe(R.string.app_target_video_description)
+    PresetTargetCategory.MUSIC -> stringResourceSafe(R.string.app_target_music_description)
+    PresetTargetCategory.SHOPPING -> stringResourceSafe(R.string.app_target_shopping_description)
+    PresetTargetCategory.GAMES -> stringResourceSafe(R.string.app_target_games_description)
 }
 
 @Composable
