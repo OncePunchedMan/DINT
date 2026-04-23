@@ -1,5 +1,7 @@
 package com.example.doineedto
 
+import android.app.TimePickerDialog
+import androidx.compose.ui.platform.LocalContext
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
@@ -1360,7 +1362,7 @@ private fun ScheduleSection(
             supportingContent = {
                 Text(
                     if (isEnabled) {
-                        "Active ${formatMinutes(startMinutes)} to ${formatMinutes(endMinutes)}"
+                        "Active from ${formatMinutes(startMinutes)} to ${formatMinutes(endMinutes)}"
                     } else {
                         stringResourceSafe(R.string.schedule_description)
                     }
@@ -1394,35 +1396,38 @@ private fun TimeAdjustRow(
     minutes: Int,
     onChange: (Int) -> Unit,
 ) {
+    val context = LocalContext.current
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = "$label: ${formatMinutes(minutes)}",
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 4.dp),
             style = MaterialTheme.typography.bodyMedium
         )
         Button(
-            onClick = { onChange(minutes - 30) },
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-            )
+            onClick = {
+                val hour = minutes / 60
+                val minute = minutes % 60
+                TimePickerDialog(
+                    context,
+                    { _, selectedHour, selectedMinute ->
+                        onChange(selectedHour * 60 + selectedMinute)
+                    },
+                    hour,
+                    minute,
+                    true
+                ).show()
+            }
         ) {
-            Text("-30m")
-        }
-        Button(
-            onClick = { onChange(minutes + 30) },
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        ) {
-            Text("+30m")
+            Text("Set time")
         }
     }
 }
