@@ -52,7 +52,10 @@ class UnlockAccessibilityService : AccessibilityService() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
                     Intent.ACTION_USER_PRESENT -> preferences.markUnlockPending()
-                    Intent.ACTION_SCREEN_OFF -> preferences.clearUnlockPending()
+                    Intent.ACTION_SCREEN_OFF -> {
+                        preferences.clearUnlockPending()
+                        preferences.clearPendingUnlockLog()
+                    }
                 }
             }
         }

@@ -4,6 +4,7 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.os.Handler
@@ -51,6 +52,16 @@ class InterventionActivity : ComponentActivity() {
     private var decisionMade = false
     private var hardModeEnabled = false
     private var shouldHideLockOutcomes = false
+    private lateinit var preferences: AppPreferences
+    private val screenOffReceiver =
+        object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action != Intent.ACTION_SCREEN_OFF || decisionMade || isFinishing) return
+                preferences.clearUnlockPending()
+                preferences.clearPendingUnlockLog()
+                finish()
+            }
+        }
     private val relaunchHandler = Handler(Looper.getMainLooper())
     private val relaunchRunnable = Runnable {
         if (hardModeEnabled && !decisionMade && !isFinishing) {
@@ -61,11 +72,12 @@ class InterventionActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
-        val preferences = AppPreferences(this)
+        preferences = AppPreferences(this)
         val waitMillis = preferences.waitDurationMillis()
         hardModeEnabled = preferences.isHardModeEnabled()
         shouldHideLockOutcomes = preferences.shouldHideLockOutcomes()
         setFinishOnTouchOutside(false)
+        registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
 
         setContent {
             var remainingMillis by androidx.compose.runtime.remember { mutableLongStateOf(waitMillis) }
@@ -147,6 +159,7 @@ class InterventionActivity : ComponentActivity() {
     override fun onDestroy() {
         timer?.cancel()
         relaunchHandler.removeCallbacks(relaunchRunnable)
+        runCatching { unregisterReceiver(screenOffReceiver) }
         super.onDestroy()
     }
 
