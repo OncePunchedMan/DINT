@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.doineedto"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.0.1"
+        versionCode = providers.environmentVariable("DINT_VERSION_CODE").orNull?.toIntOrNull() ?: 1
+        versionName = providers.environmentVariable("DINT_VERSION_NAME").orNull?.takeIf { it.isNotBlank() } ?: "0.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -21,12 +21,35 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
+
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+    }
+
+    val ciKeystorePath = providers.environmentVariable("DINT_KEYSTORE_FILE").orNull?.takeIf { it.isNotBlank() }
+    val ciKeystorePassword = providers.environmentVariable("DINT_KEYSTORE_PASSWORD").orNull?.takeIf { it.isNotBlank() }
+    val ciKeyAlias = providers.environmentVariable("DINT_KEY_ALIAS").orNull?.takeIf { it.isNotBlank() }
+    val ciKeyPassword = providers.environmentVariable("DINT_KEY_PASSWORD").orNull?.takeIf { it.isNotBlank() }
+
+    if (
+        ciKeystorePath != null &&
+        ciKeystorePassword != null &&
+        ciKeyAlias != null &&
+        ciKeyPassword != null
+    ) {
+        signingConfigs.getByName("debug") {
+            storeFile = file(ciKeystorePath)
+            storePassword = ciKeystorePassword
+            keyAlias = ciKeyAlias
+            keyPassword = ciKeyPassword
         }
     }
 

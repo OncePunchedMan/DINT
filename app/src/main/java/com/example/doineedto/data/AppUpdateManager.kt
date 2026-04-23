@@ -6,7 +6,6 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
-import com.example.doineedto.BuildConfig
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -30,7 +29,7 @@ class AppUpdateManager(private val context: Context) {
         val release = fetchLatestRelease()
         val releaseVersion = release.tagName.removePrefix("v")
 
-        return if (isNewerVersion(releaseVersion, BuildConfig.VERSION_NAME)) {
+        return if (isNewerVersion(releaseVersion, currentVersionName())) {
             UpdateCheckResult.Available(release.copy(versionName = releaseVersion))
         } else {
             UpdateCheckResult.UpToDate
@@ -117,17 +116,22 @@ class AppUpdateManager(private val context: Context) {
     private fun openConnection(url: String): HttpURLConnection {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.setRequestProperty("Accept", "application/vnd.github+json")
-        connection.setRequestProperty("User-Agent", "Dint/${BuildConfig.VERSION_NAME}")
+        connection.setRequestProperty("User-Agent", "Dint/${currentVersionName()}")
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
 
-        if (connection.responseCode !in 200..299) {
+        val responseCode = connection.responseCode
+        if (responseCode !in 200..299) {
             val message = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
             connection.disconnect()
-            error("GitHub request failed: ${connection.responseCode} $message")
+            error("GitHub request failed: $responseCode $message")
         }
 
         return connection
+    }
+
+    private fun currentVersionName(): String {
+        return context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0.0"
     }
 
     companion object {
