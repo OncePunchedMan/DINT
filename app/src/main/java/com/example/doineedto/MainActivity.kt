@@ -1,7 +1,5 @@
 package com.example.doineedto
 
-import android.app.TimePickerDialog
-import androidx.compose.ui.platform.LocalContext
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
@@ -46,7 +44,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -1390,13 +1391,36 @@ private fun ScheduleSection(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TimeAdjustRow(
     label: String,
     minutes: Int,
     onChange: (Int) -> Unit,
 ) {
-    val context = LocalContext.current
+    var showPicker by remember { mutableStateOf(false) }
+    val timePickerState = rememberTimePickerState(
+        initialHour = minutes / 60,
+        initialMinute = minutes % 60,
+        is24Hour = true,
+    )
+
+    if (showPicker) {
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            title = { Text(label) },
+            text = { TimePicker(state = timePickerState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onChange(timePickerState.hour * 60 + timePickerState.minute)
+                    showPicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPicker = false }) { Text("Cancel") }
+            }
+        )
+    }
 
     Row(
         modifier = Modifier
@@ -1412,21 +1436,7 @@ private fun TimeAdjustRow(
                 .padding(end = 4.dp),
             style = MaterialTheme.typography.bodyMedium
         )
-        Button(
-            onClick = {
-                val hour = minutes / 60
-                val minute = minutes % 60
-                TimePickerDialog(
-                    context,
-                    { _, selectedHour, selectedMinute ->
-                        onChange(selectedHour * 60 + selectedMinute)
-                    },
-                    hour,
-                    minute,
-                    true
-                ).show()
-            }
-        ) {
+        Button(onClick = { showPicker = true }) {
             Text("Set time")
         }
     }
@@ -1454,33 +1464,35 @@ private fun StatsSection(
             StatCard("Continued", continuedUnlocks.toString(), Modifier.weight(1f))
             StatCard("Stopped", keptLockedUnlocks.toString(), Modifier.weight(1f))
         }
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                visibleDailyCounts.forEach { day ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(day.label, style = MaterialTheme.typography.bodyMedium)
-                        Text("${day.count}", fontWeight = FontWeight.SemiBold)
+        if (dailyCounts.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    visibleDailyCounts.forEach { day ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(day.label, style = MaterialTheme.typography.bodyMedium)
+                            Text("${day.count}", fontWeight = FontWeight.SemiBold)
+                        }
                     }
-                }
-                if (dailyCounts.size > 3 && !showAllDays) {
-                    Button(
-                        onClick = { showAllDays = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                    ) {
-                        Text(stringResourceSafe(R.string.show_more_days))
+                    if (dailyCounts.size > 3 && !showAllDays) {
+                        Button(
+                            onClick = { showAllDays = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        ) {
+                            Text(stringResourceSafe(R.string.show_more_days))
+                        }
                     }
                 }
             }
