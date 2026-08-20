@@ -2,12 +2,7 @@ package com.example.doineedto.data
 
 import android.content.Context
 import org.json.JSONArray
-import org.json.JSONObject
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
-import java.util.LinkedHashMap
-import java.util.Locale
 import kotlin.math.roundToLong
 
 class AppPreferences(context: Context) {
@@ -24,6 +19,19 @@ class AppPreferences(context: Context) {
 
     fun setHardModeEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_HARD_MODE_ENABLED, enabled).apply()
+    }
+
+    fun isBackgroundUpdateCheckEnabled(): Boolean =
+        prefs.getBoolean(KEY_BACKGROUND_UPDATE_CHECK_ENABLED, true)
+
+    fun setBackgroundUpdateCheckEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BACKGROUND_UPDATE_CHECK_ENABLED, enabled).apply()
+    }
+
+    fun getLastNotifiedUpdateVersion(): String? = prefs.getString(KEY_LAST_NOTIFIED_UPDATE_VERSION, null)
+
+    fun setLastNotifiedUpdateVersion(versionName: String) {
+        prefs.edit().putString(KEY_LAST_NOTIFIED_UPDATE_VERSION, versionName).apply()
     }
 
     fun hasSeenInitialSetup(): Boolean = prefs.getBoolean(KEY_HAS_SEEN_INITIAL_SETUP, false)
@@ -101,26 +109,13 @@ class AppPreferences(context: Context) {
         prefs.edit().putLong(KEY_PENDING_UNLOCK_AT, 0L).apply()
     }
 
-    fun clearPendingUnlockLog() {
-        val updated = getUnlockLogs().filterNot { it.action == UnlockAction.PENDING.value }
-        saveUnlockLogs(updated)
-    }
-
     fun shouldCooldownIntervention(cooldownMillis: Long = 5_000L): Boolean {
         val lastInterventionAt = prefs.getLong(KEY_LAST_INTERVENTION_AT, 0L)
         return (System.currentTimeMillis() - lastInterventionAt) < cooldownMillis
     }
 
     fun markInterventionShown() {
-        val now = System.currentTimeMillis()
-        prefs.edit().putLong(KEY_LAST_INTERVENTION_AT, now).apply()
-        appendUnlockLog(
-            UnlockLogEntry(
-                timestamp = now,
-                reason = "",
-                action = UnlockAction.PENDING.value,
-            )
-        )
+        prefs.edit().putLong(KEY_LAST_INTERVENTION_AT, System.currentTimeMillis()).apply()
     }
 
     fun waitDurationMillis(): Long {
@@ -128,46 +123,16 @@ class AppPreferences(context: Context) {
         return (friction / 100f * MAX_WAIT_MILLIS).roundToLong()
     }
 
-    fun shouldRejectRepeatedReason(reason: String, repetitionThreshold: Int = 3): Boolean {
-        if (!ReasonValidator.isDistractionReason(reason)) return false
+    fun hasMigratedLogsToRoom(): Boolean = prefs.getBoolean(KEY_HAS_MIGRATED_LOGS_TO_ROOM, false)
 
-        val normalizedReason = ReasonValidator.normalizeReason(reason)
-        if (normalizedReason.isBlank()) return false
-
-        val cutoff = System.currentTimeMillis() - REPEATED_REASON_COOLDOWN_MILLIS
-        val recentMatches = getUnlockLogs()
-            .asSequence()
-            .filter { it.action != UnlockAction.PENDING.value }
-            .filter { it.timestamp >= cutoff }
-            .count { entry ->
-                ReasonValidator.normalizeReason(entry.reason) == normalizedReason
-            }
-
-        return recentMatches >= repetitionThreshold
+    fun markLogsMigratedToRoom() {
+        prefs.edit().putBoolean(KEY_HAS_MIGRATED_LOGS_TO_ROOM, true).apply()
     }
 
-    fun completeLatestUnlock(reason: String, action: UnlockAction) {
-        val logs = getUnlockLogs().toMutableList()
-        val index = logs.indexOfLast { it.action == UnlockAction.PENDING.value }
-        val cleanReason = reason.trim()
-
-        if (index >= 0) {
-            logs[index] = logs[index].copy(
-                reason = cleanReason,
-                action = action.value,
-            )
-        } else {
-            logs += UnlockLogEntry(
-                timestamp = System.currentTimeMillis(),
-                reason = cleanReason,
-                action = action.value,
-            )
-        }
-
-        saveUnlockLogs(logs)
-    }
-
-    fun getUnlockLogs(): List<UnlockLogEntry> {
+    // Legacy SharedPreferences-backed unlock log storage, kept only so UnlockLogRepository can
+    // migrate existing entries into Room once. Not for any other use -- see getUnlockLogs()/etc.
+    // that used to live here, now backed by Room via UnlockLogRepository.
+    fun getUnlockLogsLegacy(): List<UnlockLogEntry> {
         val raw = prefs.getString(KEY_UNLOCK_LOGS, "[]") ?: "[]"
         val array = JSONArray(raw)
         return buildList {
@@ -184,25 +149,38 @@ class AppPreferences(context: Context) {
         }.sortedByDescending { it.timestamp }
     }
 
-    fun getDailyUnlockCounts(limit: Int = 7): List<DailyUnlockCount> {
-        val formatter = SimpleDateFormat("EEE, MMM d", Locale.getDefault())
-        val grouped = LinkedHashMap<String, Int>()
-
-        getUnlockLogs()
-            .sortedByDescending { it.timestamp }
-            .forEach { entry ->
-                val key = formatter.format(Date(entry.timestamp))
-                grouped[key] = (grouped[key] ?: 0) + 1
-            }
-
-        return grouped.entries.take(limit).map { DailyUnlockCount(it.key, it.value) }
+    fun clearLegacyUnlockLogs() {
+        prefs.edit().remove(KEY_UNLOCK_LOGS).apply()
     }
 
-    fun totalUnlocks(): Int = getUnlockLogs().size
+    fun getExcludedPackages(): Set<String> {
+        val raw = prefs.getString(KEY_EXCLUDED_PACKAGES, "[]") ?: "[]"
+        val array = JSONArray(raw)
+        return buildSet {
+            for (index in 0 until array.length()) {
+                array.optString(index)?.takeIf { it.isNotBlank() }?.let { add(it) }
+            }
+        }
+    }
 
-    fun continuedUnlocks(): Int = getUnlockLogs().count { it.action == UnlockAction.CONTINUE.value }
+    fun addExcludedPackage(packageName: String) {
+        val updated = getExcludedPackages() + packageName
+        saveExcludedPackages(updated)
+    }
 
-    fun keptLockedUnlocks(): Int = getUnlockLogs().count { it.action == UnlockAction.KEEP_LOCKED.value }
+    fun removeExcludedPackage(packageName: String) {
+        val updated = getExcludedPackages() - packageName
+        saveExcludedPackages(updated)
+    }
+
+    fun isExcludedPackage(packageName: String): Boolean =
+        packageName in DEFAULT_EXCLUDED_PACKAGES || packageName in getExcludedPackages()
+
+    private fun saveExcludedPackages(packages: Set<String>) {
+        val array = JSONArray()
+        packages.forEach { array.put(it) }
+        prefs.edit().putString(KEY_EXCLUDED_PACKAGES, array.toString()).apply()
+    }
 
     fun getAppTargetSelection(category: PresetTargetCategory): AppTargetSelection? {
         val packageName = prefs.getString(appTargetPackageKey(category), null) ?: return null
@@ -227,29 +205,6 @@ class AppPreferences(context: Context) {
             .apply()
     }
 
-    private fun appendUnlockLog(entry: UnlockLogEntry) {
-        val updated = (getUnlockLogs() + entry).sortedByDescending { it.timestamp }.take(MAX_LOG_ENTRIES)
-        saveUnlockLogs(updated)
-    }
-
-    private fun saveUnlockLogs(entries: List<UnlockLogEntry>) {
-        val array = JSONArray()
-        entries
-            .sortedByDescending { it.timestamp }
-            .take(MAX_LOG_ENTRIES)
-            .forEach { entry ->
-                array.put(
-                    JSONObject().apply {
-                        put("timestamp", entry.timestamp)
-                        put("reason", entry.reason)
-                        put("action", entry.action)
-                    }
-                )
-            }
-
-        prefs.edit().putString(KEY_UNLOCK_LOGS, array.toString()).apply()
-    }
-
     companion object {
         private const val PREFS_NAME = "do_i_need_to"
         private const val KEY_FRICTION = "friction"
@@ -260,12 +215,14 @@ class AppPreferences(context: Context) {
         private const val KEY_SCHEDULE_START_MINUTES = "schedule_start_minutes"
         private const val KEY_SCHEDULE_END_MINUTES = "schedule_end_minutes"
         private const val KEY_HARD_MODE_ENABLED = "hard_mode_enabled"
+        private const val KEY_BACKGROUND_UPDATE_CHECK_ENABLED = "background_update_check_enabled"
+        private const val KEY_LAST_NOTIFIED_UPDATE_VERSION = "last_notified_update_version"
+        private const val KEY_EXCLUDED_PACKAGES = "excluded_packages"
         private const val KEY_HIDE_LOCK_OUTCOMES = "hide_lock_outcomes"
         private const val KEY_HAS_SEEN_INITIAL_SETUP = "has_seen_initial_setup"
         private const val KEY_HAS_COMPLETED_ONBOARDING = "has_completed_onboarding"
+        private const val KEY_HAS_MIGRATED_LOGS_TO_ROOM = "has_migrated_logs_to_room"
         private const val MAX_WAIT_MILLIS = 12_000L
-        private const val MAX_LOG_ENTRIES = 200
-        private const val REPEATED_REASON_COOLDOWN_MILLIS = 3 * 60 * 60 * 1000L
 
         private fun appTargetPackageKey(category: PresetTargetCategory): String =
             "app_target_${category.key}_package"

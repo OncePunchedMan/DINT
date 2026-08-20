@@ -39,19 +39,21 @@ class AppUpdateManager(private val context: Context) {
     fun downloadUpdateApk(update: AppUpdate): File = downloadApk(update)
 
     fun promptInstall(apkFile: File) {
+        context.startActivity(installIntent(apkFile))
+    }
+
+    fun installIntent(apkFile: File): Intent {
         val apkUri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
             apkFile,
         )
 
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(apkUri, APK_MIME_TYPE)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-        )
+        return Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(apkUri, APK_MIME_TYPE)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
     }
 
     fun openUnknownAppSourcesSettings() {
