@@ -10,75 +10,42 @@ import android.os.CountDownTimer
 import android.os.Handler
 import android.os.Looper
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.ClickableText
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SuggestionChip
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
-import androidx.compose.runtime.produceState
 import com.example.doineedto.admin.FocusDeviceAdminReceiver
 import com.example.doineedto.data.AppPreferences
-import com.example.doineedto.data.ReasonValidator
-import com.example.doineedto.data.RepositoryScope
 import com.example.doineedto.data.UnlockAction
-import com.example.doineedto.data.UnlockLogRepository
 import com.example.doineedto.data.launchIntentForReason
 import com.example.doineedto.service.UnlockAccessibilityService
 import com.example.doineedto.ui.AppTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlin.math.roundToLong
+import com.example.doineedto.ui.intervention.InterventionScreen
+import com.example.doineedto.ui.intervention.InterventionViewModel
 
 class InterventionActivity : ComponentActivity() {
+    private val viewModel: InterventionViewModel by viewModels {
+        InterventionViewModel.factory((application as DintApplication).container)
+    }
     private var timer: CountDownTimer? = null
     private var decisionMade = false
     private var hardModeEnabled = false
-    private var shouldHideLockOutcomes = false
-    private lateinit var preferences: AppPreferences
-    private lateinit var repository: UnlockLogRepository
+    private val preferences: AppPreferences by lazy { (application as DintApplication).container.preferences }
     private val screenOffReceiver =
         object : android.content.BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action != Intent.ACTION_SCREEN_OFF || decisionMade || isFinishing) return
                 preferences.clearUnlockPending()
-                RepositoryScope.launch { repository.clearPendingLog() }
+                viewModel.clearPendingLog()
                 finish()
             }
         }
@@ -92,21 +59,14 @@ class InterventionActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
-        preferences = AppPreferences(this)
-        repository = UnlockLogRepository(this)
-        val waitMillis = preferences.waitDurationMillis()
-        hardModeEnabled = preferences.isHardModeEnabled()
-        shouldHideLockOutcomes = preferences.shouldHideLockOutcomes()
+        val waitMillis = viewModel.waitMillis
+        hardModeEnabled = viewModel.hardModeEnabled
         setFinishOnTouchOutside(false)
         registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
 
         setContent {
-            var remainingMillis by androidx.compose.runtime.remember { mutableLongStateOf(waitMillis) }
-            var canContinue by androidx.compose.runtime.remember { mutableStateOf(waitMillis == 0L) }
-            var reason by remember { mutableStateOf("") }
-            val isRepeatedDistractionReason by produceState(initialValue = false, reason) {
-                value = withContext(Dispatchers.IO) { repository.shouldRejectRepeatedReason(reason) }
-            }
+            var remainingMillis by remember { mutableLongStateOf(waitMillis) }
+            var canContinue by remember { mutableStateOf(waitMillis == 0L) }
 
             DisposableEffect(waitMillis) {
                 timer?.cancel()
@@ -138,39 +98,30 @@ class InterventionActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     InterventionScreen(
+                        viewModel = viewModel,
                         remainingMillis = remainingMillis,
                         canContinue = canContinue,
-                        hardModeEnabled = hardModeEnabled,
-                        hideLockOutcomes = shouldHideLockOutcomes,
-                        repository = repository,
-                        reason = reason,
-                        isRepeatedDistractionReason = isRepeatedDistractionReason,
-                        onReasonChanged = { reason = it },
-                        continueReasons = continueReasons,
-                        keepLockedReasons = keepLockedReasons,
-                        onCuratedReasonSelected = { selected ->
-                            reason = selected
-                        },
                         onKeepLockedReasonSelected = { selected ->
-                            reason = selected
+                            viewModel.onReasonChanged(selected)
                             decisionMade = true
-                            RepositoryScope.launch { repository.completeLatestUnlock(selected, UnlockAction.KEEP_LOCKED) }
+                            viewModel.completeUnlock(selected, UnlockAction.KEEP_LOCKED)
                             keepLocked()
                         },
                         onKeepLocked = {
                             decisionMade = true
-                            RepositoryScope.launch { repository.completeLatestUnlock(reason, UnlockAction.KEEP_LOCKED) }
+                            viewModel.completeUnlock(viewModel.reason.value, UnlockAction.KEEP_LOCKED)
                             keepLocked()
                         },
                         onContinue = {
                             decisionMade = true
-                            RepositoryScope.launch { repository.completeLatestUnlock(reason, UnlockAction.CONTINUE) }
+                            val reason = viewModel.reason.value
+                            viewModel.completeUnlock(reason, UnlockAction.CONTINUE)
                             openAppForReasonIfPossible(reason, preferences)
                             finish()
                         },
                         onEmergencySkip = {
                             decisionMade = true
-                            RepositoryScope.launch { repository.completeLatestUnlock(reason, UnlockAction.SKIPPED) }
+                            viewModel.completeUnlock(viewModel.reason.value, UnlockAction.SKIPPED)
                             finish()
                         },
                     )
@@ -244,370 +195,10 @@ class InterventionActivity : ComponentActivity() {
         startActivity(launchIntent)
     }
 
-companion object {
+    companion object {
         fun createIntent(context: Context): Intent =
             Intent(context, InterventionActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
     }
 }
-
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
-@androidx.compose.runtime.Composable
-private fun InterventionScreen(
-    remainingMillis: Long,
-    canContinue: Boolean,
-    hardModeEnabled: Boolean,
-    hideLockOutcomes: Boolean,
-    repository: com.example.doineedto.data.UnlockLogRepository,
-    reason: String,
-    isRepeatedDistractionReason: Boolean,
-    onReasonChanged: (String) -> Unit,
-    continueReasons: List<String>,
-    keepLockedReasons: List<String>,
-    onCuratedReasonSelected: (String) -> Unit,
-    onKeepLockedReasonSelected: (String) -> Unit,
-    onKeepLocked: () -> Unit,
-    onContinue: () -> Unit,
-    onEmergencySkip: () -> Unit,
-) {
-    val secondsLeft = (remainingMillis / 1000f).roundToLong()
-    val allCuratedReasons = remember(continueReasons, keepLockedReasons) {
-        (continueReasons + keepLockedReasons).toSet()
-    }
-    val scrollState = rememberScrollState()
-    val coroutineScope = rememberCoroutineScope()
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val isReasonValid = remember(reason, allCuratedReasons) {
-        ReasonValidator.isReasonValid(reason, allCuratedReasons)
-    }
-    val canSubmit = canContinue && isReasonValid && !isRepeatedDistractionReason
-    var showMoreContinueReasons by remember { mutableStateOf(false) }
-    var showMoreHiddenReasons by remember { mutableStateOf(false) }
-    var longPressedReason by remember { mutableStateOf<String?>(null) }
-    BackHandler(enabled = hardModeEnabled) {}
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Column(
-            modifier = Modifier.verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            PromptTitle(onEmergencySkip = onEmergencySkip)
-            Text(
-                text = "Choose a reason, edit it if needed, then decide whether this unlock is intentional.",
-                style = MaterialTheme.typography.bodyLarge
-            )
-            if (hideLockOutcomes) {
-                Text(
-                    text = "Possible reasons",
-                    style = MaterialTheme.typography.titleSmall
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    hiddenReasonOptions(showMoreHiddenReasons).forEach { option ->
-                        Box(
-                            modifier = Modifier.combinedClickable(
-                                onClick = {
-                                    if (keepLockedReasons.contains(option)) {
-                                        onKeepLockedReasonSelected(option)
-                                    } else {
-                                        onCuratedReasonSelected(option)
-                                        coroutineScope.launch {
-                                            scrollState.animateScrollTo(scrollState.maxValue)
-                                        }
-                                    }
-                                },
-                                onLongClick = { longPressedReason = option },
-                            )
-                        ) {
-                            SuggestionChip(onClick = {}, label = { Text(option) })
-                        }
-                    }
-                }
-                if (!showMoreHiddenReasons) {
-                    TextButton(onClick = { showMoreHiddenReasons = true }) {
-                        Text("Show more")
-                    }
-                }
-            } else {
-                Text(
-                    text = "Use device",
-                    style = MaterialTheme.typography.titleSmall
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    visibleContinueReasons(showMoreContinueReasons).forEach { option ->
-                        Box(
-                            modifier = Modifier.combinedClickable(
-                                onClick = {
-                                    onCuratedReasonSelected(option)
-                                    coroutineScope.launch {
-                                        scrollState.animateScrollTo(scrollState.maxValue)
-                                    }
-                                },
-                                onLongClick = { longPressedReason = option },
-                            )
-                        ) {
-                            SuggestionChip(onClick = {}, label = { Text(option) })
-                        }
-                    }
-                }
-                if (!showMoreContinueReasons) {
-                    TextButton(onClick = { showMoreContinueReasons = true }) {
-                        Text("Show more")
-                    }
-                }
-                Text(
-                    text = "Keep device locked",
-                    style = MaterialTheme.typography.titleSmall
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    keepLockedReasons.forEach { option ->
-                        Box(
-                            modifier = Modifier.combinedClickable(
-                                onClick = { onKeepLockedReasonSelected(option) },
-                                onLongClick = { longPressedReason = option },
-                            )
-                        ) {
-                            SuggestionChip(onClick = {}, label = { Text(option) })
-                        }
-                    }
-                }
-            }
-            OutlinedTextField(
-                value = reason,
-                onValueChange = onReasonChanged,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Your reason") },
-                placeholder = { Text("Message someone, check a map, take a photo...") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        // TODO: Make Enter-to-submit optional behind a user setting.
-                        keyboardController?.hide()
-                        focusManager.clearFocus()
-                    }
-                ),
-                isError = reason.isNotBlank() && (!isReasonValid || isRepeatedDistractionReason),
-                supportingText = {
-                    if (reason.isNotBlank() && isRepeatedDistractionReason) {
-                        Text("That reason has come up too often lately. Pick a clearer purpose or keep the phone locked.")
-                    } else if (reason.isNotBlank() && !isReasonValid) {
-                        Text("Use a real reason like replying, directions, camera, music, work, or another concrete task.")
-                    }
-                }
-            )
-            OutlinedButton(
-                onClick = onKeepLocked,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(text = "Keep it locked")
-            }
-            Button(
-                onClick = onContinue,
-                enabled = canSubmit,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = when {
-                        !canContinue -> "Continue in ${secondsLeft.coerceAtLeast(1)}s"
-                        reason.trim().isBlank() -> "Enter a reason to continue"
-                        isRepeatedDistractionReason -> "Pick a different reason"
-                        !isReasonValid -> "Enter a clearer reason"
-                        else -> "Use my phone"
-                    }
-                )
-            }
-            if (hardModeEnabled) {
-                Text(
-                    text = "Hard mode is on. You must interact with this reminder before using the device.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-    }
-
-    longPressedReason?.let { pressedReason ->
-        ReasonUsageDialog(
-            reason = pressedReason,
-            repository = repository,
-            onDismiss = { longPressedReason = null },
-        )
-    }
-}
-
-@androidx.compose.runtime.Composable
-private fun ReasonUsageDialog(
-    reason: String,
-    repository: com.example.doineedto.data.UnlockLogRepository,
-    onDismiss: () -> Unit,
-) {
-    var counts by remember(reason) { mutableStateOf(0 to 0) }
-
-    androidx.compose.runtime.LaunchedEffect(reason) {
-        counts = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val today = repository.countReasonUses(reason, repository.todayStartMillis())
-            val lastHour = repository.countReasonUses(reason, System.currentTimeMillis() - 3_600_000L)
-            today to lastHour
-        }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Uses of \"$reason\"") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Today: ${counts.first}")
-                Text("Last hour: ${counts.second}")
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Dismiss")
-            }
-        }
-    )
-}
-
-@androidx.compose.runtime.Composable
-private fun PromptTitle(onEmergencySkip: () -> Unit) {
-    val emergencyTag = "emergency_skip"
-    val promptTitle = buildAnnotatedString {
-        append("Why are you opening your phone right ")
-        pushStringAnnotation(tag = emergencyTag, annotation = emergencyTag)
-        pushStyle(
-            SpanStyle(
-                color = MaterialTheme.colorScheme.tertiary,
-                fontWeight = FontWeight.SemiBold,
-            )
-        )
-        append("now")
-        pop()
-        pop()
-        append("?")
-    }
-
-    ClickableText(
-        text = promptTitle,
-        style = MaterialTheme.typography.headlineMedium.copy(
-            color = MaterialTheme.colorScheme.onBackground
-        ),
-        onClick = { offset ->
-            promptTitle.getStringAnnotations(
-                tag = emergencyTag,
-                start = offset,
-                end = offset,
-            ).firstOrNull()?.let {
-                onEmergencySkip()
-            }
-        }
-    )
-}
-
-private fun visibleContinueReasons(showMore: Boolean): List<String> =
-    if (showMore) continueReasons else continueReasons.take(6)
-
-private fun hiddenReasonOptions(showMore: Boolean): List<String> =
-    if (showMore) mergedReasons else mergedReasons.take(8)
-
-private val continueReasons = listOf(
-    "Reply to someone",
-    "Check messages",
-    "Call someone",
-    "Look something up",
-    "Use the camera",
-    "Check directions",
-    "Catch up on social media",
-    "Look at memes",
-    "Open Instagram",
-    "Open TikTok",
-    "Open YouTube",
-    "Check Reddit",
-    "Play music or a podcast",
-    "Check my calendar",
-    "Open a ticket or booking",
-    "Check email",
-    "Check my bank",
-    "Read the news",
-    "Read something",
-    "Watch a video",
-    "Check the weather",
-    "Use notes or tasks",
-    "Shop for something",
-    "Play a game",
-    "Use two-factor authentication",
-    "Scan a code",
-    "Check a delivery",
-    "Order food",
-    "Pay for something",
-    "Read a document",
-    "Join a call",
-    "Something else",
-)
-
-private val keepLockedReasons = listOf(
-    "Just checking",
-    "I opened it automatically",
-    "I am bored",
-    "I want to scroll",
-    "I want to check Instagram",
-    "I want to check TikTok",
-    "I just want dopamine",
-    "No real reason",
-)
-
-private val mergedReasons = listOf(
-    "Reply to someone",
-    "Check messages",
-    "Just checking",
-    "Look something up",
-    "I opened it automatically",
-    "Use the camera",
-    "I am bored",
-    "Check directions",
-    "Catch up on social media",
-    "Look at memes",
-    "Open Instagram",
-    "I want to check Instagram",
-    "Open TikTok",
-    "I want to check TikTok",
-    "Open YouTube",
-    "No real reason",
-    "I want to scroll",
-    "Play music or a podcast",
-    "Check my calendar",
-    "Open a ticket or booking",
-    "Check email",
-    "Check my bank",
-    "Read the news",
-    "Watch a video",
-    "Read something",
-    "Check the weather",
-    "Use notes or tasks",
-    "Shop for something",
-    "Play a game",
-    "Use two-factor authentication",
-    "Scan a code",
-    "Check a delivery",
-    "Order food",
-    "Pay for something",
-    "Read a document",
-    "Join a call",
-    "I just want dopamine",
-    "Something else",
-)
