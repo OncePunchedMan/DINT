@@ -2,6 +2,7 @@ package opb.myniceapp.dint.data
 
 import android.content.Context
 import org.json.JSONArray
+import org.json.JSONException
 import java.util.Calendar
 import kotlin.math.roundToLong
 
@@ -133,8 +134,7 @@ class AppPreferences(context: Context) {
     // migrate existing entries into Room once. Not for any other use -- see getUnlockLogs()/etc.
     // that used to live here, now backed by Room via UnlockLogRepository.
     fun getUnlockLogsLegacy(): List<UnlockLogEntry> {
-        val raw = prefs.getString(KEY_UNLOCK_LOGS, "[]") ?: "[]"
-        val array = JSONArray(raw)
+        val array = readJsonArrayPreference(KEY_UNLOCK_LOGS)
         return buildList {
             for (index in 0 until array.length()) {
                 val item = array.optJSONObject(index) ?: continue
@@ -154,8 +154,7 @@ class AppPreferences(context: Context) {
     }
 
     fun getExcludedPackages(): Set<String> {
-        val raw = prefs.getString(KEY_EXCLUDED_PACKAGES, "[]") ?: "[]"
-        val array = JSONArray(raw)
+        val array = readJsonArrayPreference(KEY_EXCLUDED_PACKAGES)
         return buildSet {
             for (index in 0 until array.length()) {
                 array.optString(index)?.takeIf { it.isNotBlank() }?.let { add(it) }
@@ -183,8 +182,8 @@ class AppPreferences(context: Context) {
     }
 
     fun getAppTargetSelection(category: PresetTargetCategory): AppTargetSelection? {
-        val packageName = prefs.getString(appTargetPackageKey(category), null) ?: return null
-        val label = prefs.getString(appTargetLabelKey(category), null) ?: return null
+        val packageName = readStringPreference(appTargetPackageKey(category)) ?: return null
+        val label = readStringPreference(appTargetLabelKey(category)) ?: return null
         return AppTargetSelection(packageName = packageName, label = label)
     }
 
@@ -203,6 +202,25 @@ class AppPreferences(context: Context) {
             .remove(appTargetPackageKey(category))
             .remove(appTargetLabelKey(category))
             .apply()
+    }
+
+    private fun readJsonArrayPreference(key: String): JSONArray {
+        val raw = readStringPreference(key) ?: return JSONArray()
+        return try {
+            JSONArray(raw)
+        } catch (_: JSONException) {
+            prefs.edit().remove(key).apply()
+            JSONArray()
+        }
+    }
+
+    private fun readStringPreference(key: String): String? {
+        return try {
+            prefs.getString(key, null)
+        } catch (_: ClassCastException) {
+            prefs.edit().remove(key).apply()
+            null
+        }
     }
 
     companion object {

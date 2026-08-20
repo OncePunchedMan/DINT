@@ -34,17 +34,21 @@ fun queryLaunchableApps(context: Context): List<LaunchableApp> {
     val packageManager = context.packageManager
     val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
 
-    val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL.toLong())
-    } else {
-        null
-    }
+    val resolvedActivities = try {
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL.toLong())
+        } else {
+            null
+        }
 
-    val resolvedActivities = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        packageManager.queryIntentActivities(launcherIntent, flags!!)
-    } else {
-        @Suppress("DEPRECATION")
-        packageManager.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            packageManager.queryIntentActivities(launcherIntent, flags!!)
+        } else {
+            @Suppress("DEPRECATION")
+            packageManager.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL)
+        }
+    } catch (_: RuntimeException) {
+        return emptyList()
     }
 
     return resolvedActivities

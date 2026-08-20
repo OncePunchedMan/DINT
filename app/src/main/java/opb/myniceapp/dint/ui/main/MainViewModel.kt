@@ -196,21 +196,29 @@ class MainViewModel(
     private fun refreshSystemStatus() {
         val hasCompletedOnboarding = preferences.hasCompletedOnboarding()
         _uiState.value = _uiState.value.copy(
-            friction = preferences.getFriction(),
-            hardModeEnabled = preferences.isHardModeEnabled(),
-            hideLockOutcomes = preferences.shouldHideLockOutcomes(),
-            scheduleWindow = preferences.getScheduleWindow(),
-            isBatteryOptimizationIgnored = isBatteryOptimizationIgnored(appContext),
-            areNotificationsEnabled = areNotificationsEnabled(appContext),
-            isAccessibilityEnabled = isAccessibilityEnabled(appContext),
-            isDeviceAdminEnabled = isDeviceAdminEnabled(appContext),
-            appVersionName = appVersionName(appContext),
+            friction = safeRead(defaultValue = 40) { preferences.getFriction() },
+            hardModeEnabled = safeRead(defaultValue = false) { preferences.isHardModeEnabled() },
+            hideLockOutcomes = safeRead(defaultValue = false) { preferences.shouldHideLockOutcomes() },
+            scheduleWindow = safeRead(
+                defaultValue = ScheduleWindow(
+                    isEnabled = false,
+                    startMinutes = 8 * 60,
+                    endMinutes = 22 * 60,
+                )
+            ) { preferences.getScheduleWindow() },
+            isBatteryOptimizationIgnored = safeRead(defaultValue = false) { isBatteryOptimizationIgnored(appContext) },
+            areNotificationsEnabled = safeRead(defaultValue = false) { areNotificationsEnabled(appContext) },
+            isAccessibilityEnabled = safeRead(defaultValue = false) { isAccessibilityEnabled(appContext) },
+            isDeviceAdminEnabled = safeRead(defaultValue = false) { isDeviceAdminEnabled(appContext) },
+            appVersionName = safeRead(defaultValue = "1.0") { appVersionName(appContext) },
             hasCompletedOnboarding = hasCompletedOnboarding,
-            shouldShowPermissionSetup = !hasCompletedOnboarding || hasMissingSetupItems(appContext),
-            excludedPackages = preferences.getExcludedPackages(),
-            appTargetSelections = PresetTargetCategory.entries.associateWith { preferences.getAppTargetSelection(it) },
-            launchableApps = queryLaunchableApps(appContext),
-            backgroundUpdateCheckEnabled = preferences.isBackgroundUpdateCheckEnabled(),
+            shouldShowPermissionSetup = !hasCompletedOnboarding || safeRead(defaultValue = true) { hasMissingSetupItems(appContext) },
+            excludedPackages = safeRead(defaultValue = emptySet()) { preferences.getExcludedPackages() },
+            appTargetSelections = safeRead(defaultValue = emptyMap()) {
+                PresetTargetCategory.entries.associateWith { preferences.getAppTargetSelection(it) }
+            },
+            launchableApps = safeRead(defaultValue = emptyList()) { queryLaunchableApps(appContext) },
+            backgroundUpdateCheckEnabled = safeRead(defaultValue = true) { preferences.isBackgroundUpdateCheckEnabled() },
         )
     }
 
@@ -240,6 +248,13 @@ class MainViewModel(
         }
     }
 }
+
+private inline fun <T> safeRead(defaultValue: T, block: () -> T): T =
+    try {
+        block()
+    } catch (_: RuntimeException) {
+        defaultValue
+    }
 
 private fun isBatteryOptimizationIgnored(context: Context): Boolean {
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
