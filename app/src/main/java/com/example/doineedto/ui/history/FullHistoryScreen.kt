@@ -1,4 +1,4 @@
-package com.example.doineedto
+package com.example.doineedto.ui.history
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,45 +11,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.example.doineedto.data.UnlockLogEntry
-import com.example.doineedto.data.UnlockLogRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-
-private const val PAGE_SIZE = 50
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.doineedto.DintApplication
+import com.example.doineedto.R
+import com.example.doineedto.ui.home.HistoryCard
 
 @Composable
-internal fun FullHistoryScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
-    val repository = remember(context) { UnlockLogRepository(context) }
-    var entries by remember { mutableStateOf(listOf<UnlockLogEntry>()) }
-    var offset by remember { mutableIntStateOf(0) }
-    var hasMore by remember { mutableStateOf(true) }
-    var isLoading by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
+fun FullHistoryScreen(onBack: () -> Unit) {
+    val container = (LocalContext.current.applicationContext as DintApplication).container
+    val viewModel: FullHistoryViewModel = viewModel(factory = FullHistoryViewModel.factory(container))
 
-    suspend fun loadNextPage() {
-        isLoading = true
-        val page = withContext(Dispatchers.IO) { repository.getPage(PAGE_SIZE, offset) }
-        entries = entries + page
-        offset += page.size
-        hasMore = page.size == PAGE_SIZE
-        isLoading = false
-    }
-
-    LaunchedEffect(repository) { loadNextPage() }
+    val entries by viewModel.entries.collectAsStateWithLifecycle()
+    val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(
@@ -72,7 +52,7 @@ internal fun FullHistoryScreen(onBack: () -> Unit) {
             if (hasMore) {
                 item {
                     Button(
-                        onClick = { coroutineScope.launch { loadNextPage() } },
+                        onClick = { viewModel.loadNextPage() },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading,
                     ) {
