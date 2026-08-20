@@ -22,3 +22,6 @@ CLAUDE.md
 hs_err_pid*
 replay_pid*
 .kotlin/
+graphify-out/
+Agents.md
+.codex/
