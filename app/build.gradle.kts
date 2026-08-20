@@ -27,7 +27,8 @@ android {
         }
 
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -46,12 +47,13 @@ android {
         ciKeyAlias != null &&
         ciKeyPassword != null
     ) {
-        signingConfigs.getByName("debug") {
+        signingConfigs.create("release") {
             storeFile = file(ciKeystorePath)
             storePassword = ciKeystorePassword
             keyAlias = ciKeyAlias
             keyPassword = ciKeyPassword
         }
+        buildTypes.getByName("release").signingConfig = signingConfigs.getByName("release")
     }
 
     compileOptions {
