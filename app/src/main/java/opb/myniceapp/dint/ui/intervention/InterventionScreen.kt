@@ -103,6 +103,11 @@ fun InterventionScreen(
                     hiddenReasonOptions(showMoreHiddenReasons).forEach { option ->
                         Box(
                             modifier = Modifier.combinedClickable(
+                                onClick = {},
+                                onLongClick = { longPressedReason = option },
+                            )
+                        ) {
+                            SuggestionChip(
                                 onClick = {
                                     if (keepLockedReasons.contains(option)) {
                                         onKeepLockedReasonSelected(option)
@@ -113,10 +118,8 @@ fun InterventionScreen(
                                         }
                                     }
                                 },
-                                onLongClick = { longPressedReason = option },
+                                label = { Text(option) },
                             )
-                        ) {
-                            SuggestionChip(onClick = {}, label = { Text(option) })
                         }
                     }
                 }
@@ -137,16 +140,19 @@ fun InterventionScreen(
                     visibleContinueReasons(showMoreContinueReasons).forEach { option ->
                         Box(
                             modifier = Modifier.combinedClickable(
+                                onClick = {},
+                                onLongClick = { longPressedReason = option },
+                            )
+                        ) {
+                            SuggestionChip(
                                 onClick = {
                                     viewModel.onReasonChanged(option)
                                     coroutineScope.launch {
                                         scrollState.animateScrollTo(scrollState.maxValue)
                                     }
                                 },
-                                onLongClick = { longPressedReason = option },
+                                label = { Text(option) },
                             )
-                        ) {
-                            SuggestionChip(onClick = {}, label = { Text(option) })
                         }
                     }
                 }
@@ -166,11 +172,14 @@ fun InterventionScreen(
                     keepLockedReasons.forEach { option ->
                         Box(
                             modifier = Modifier.combinedClickable(
-                                onClick = { onKeepLockedReasonSelected(option) },
+                                onClick = {},
                                 onLongClick = { longPressedReason = option },
                             )
                         ) {
-                            SuggestionChip(onClick = {}, label = { Text(option) })
+                            SuggestionChip(
+                                onClick = { onKeepLockedReasonSelected(option) },
+                                label = { Text(option) },
+                            )
                         }
                     }
                 }
