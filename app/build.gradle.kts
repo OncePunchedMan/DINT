@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.doineedto"
+    namespace = "opb.myniceapp.dint"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.doineedto"
+        applicationId = "opb.myniceapp.dint"
         minSdk = 29
         targetSdk = 34
         versionCode = providers.environmentVariable("DINT_VERSION_CODE").orNull?.toIntOrNull() ?: 1

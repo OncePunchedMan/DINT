@@ -5,5 +5,5 @@
     android:canRetrieveWindowContent="false"
     android:description="@string/main_intro"
     android:notificationTimeout="50"
-    android:settingsActivity="com.example.doineedto.MainActivity" />
+    android:settingsActivity="opb.myniceapp.dint.MainActivity" />
 
