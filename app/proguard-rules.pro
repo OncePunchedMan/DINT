@@ -9,3 +9,15 @@
 -keep class opb.myniceapp.dint.data.db.UnlockLogDatabase_Impl { *; }
 -keep interface opb.myniceapp.dint.data.db.UnlockLogDao { *; }
 -keep class opb.myniceapp.dint.data.db.UnlockLogEntity { *; }
+
+# androidx.lifecycle.compose.LocalLifecycleOwner (used internally by every
+# collectAsStateWithLifecycle() call in this app) reflectively looks up
+# androidx.compose.ui.platform.LocalLifecycleOwner for backward compatibility.
+# lifecycle-runtime-compose only ships a *conditional* keep rule for this
+# (-if ... -keep ...) that never fires here (confirmed: even a corrected,
+# non-conditional single-method -keep wasn't enough -- R8's mapping file
+# shows it fully INLINES these trivial top-level CompositionLocal property
+# getters rather than just renaming them, so a method-signature keep can't
+# protect something already eliminated). Keep the whole file's class
+# unconditionally instead, confirmed by re-testing on an emulator.
+-keep class androidx.compose.ui.platform.AndroidCompositionLocals_androidKt { *; }
