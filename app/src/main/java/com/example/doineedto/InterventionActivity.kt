@@ -12,6 +12,9 @@ import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,6 +26,7 @@ import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -47,14 +51,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
+import androidx.compose.runtime.produceState
 import com.example.doineedto.admin.FocusDeviceAdminReceiver
 import com.example.doineedto.data.AppPreferences
 import com.example.doineedto.data.ReasonValidator
+import com.example.doineedto.data.RepositoryScope
 import com.example.doineedto.data.UnlockAction
+import com.example.doineedto.data.UnlockLogRepository
 import com.example.doineedto.data.launchIntentForReason
 import com.example.doineedto.service.UnlockAccessibilityService
 import com.example.doineedto.ui.AppTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToLong
 
 class InterventionActivity : ComponentActivity() {
@@ -63,12 +72,13 @@ class InterventionActivity : ComponentActivity() {
     private var hardModeEnabled = false
     private var shouldHideLockOutcomes = false
     private lateinit var preferences: AppPreferences
+    private lateinit var repository: UnlockLogRepository
     private val screenOffReceiver =
         object : android.content.BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action != Intent.ACTION_SCREEN_OFF || decisionMade || isFinishing) return
                 preferences.clearUnlockPending()
-                preferences.clearPendingUnlockLog()
+                RepositoryScope.launch { repository.clearPendingLog() }
                 finish()
             }
         }
@@ -83,6 +93,7 @@ class InterventionActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
         preferences = AppPreferences(this)
+        repository = UnlockLogRepository(this)
         val waitMillis = preferences.waitDurationMillis()
         hardModeEnabled = preferences.isHardModeEnabled()
         shouldHideLockOutcomes = preferences.shouldHideLockOutcomes()
@@ -93,8 +104,8 @@ class InterventionActivity : ComponentActivity() {
             var remainingMillis by androidx.compose.runtime.remember { mutableLongStateOf(waitMillis) }
             var canContinue by androidx.compose.runtime.remember { mutableStateOf(waitMillis == 0L) }
             var reason by remember { mutableStateOf("") }
-            val isRepeatedDistractionReason = remember(reason) {
-                preferences.shouldRejectRepeatedReason(reason)
+            val isRepeatedDistractionReason by produceState(initialValue = false, reason) {
+                value = withContext(Dispatchers.IO) { repository.shouldRejectRepeatedReason(reason) }
             }
 
             DisposableEffect(waitMillis) {
@@ -131,6 +142,7 @@ class InterventionActivity : ComponentActivity() {
                         canContinue = canContinue,
                         hardModeEnabled = hardModeEnabled,
                         hideLockOutcomes = shouldHideLockOutcomes,
+                        repository = repository,
                         reason = reason,
                         isRepeatedDistractionReason = isRepeatedDistractionReason,
                         onReasonChanged = { reason = it },
@@ -142,23 +154,23 @@ class InterventionActivity : ComponentActivity() {
                         onKeepLockedReasonSelected = { selected ->
                             reason = selected
                             decisionMade = true
-                            preferences.completeLatestUnlock(selected, UnlockAction.KEEP_LOCKED)
+                            RepositoryScope.launch { repository.completeLatestUnlock(selected, UnlockAction.KEEP_LOCKED) }
                             keepLocked()
                         },
                         onKeepLocked = {
                             decisionMade = true
-                            preferences.completeLatestUnlock(reason, UnlockAction.KEEP_LOCKED)
+                            RepositoryScope.launch { repository.completeLatestUnlock(reason, UnlockAction.KEEP_LOCKED) }
                             keepLocked()
                         },
                         onContinue = {
                             decisionMade = true
-                            preferences.completeLatestUnlock(reason, UnlockAction.CONTINUE)
+                            RepositoryScope.launch { repository.completeLatestUnlock(reason, UnlockAction.CONTINUE) }
                             openAppForReasonIfPossible(reason, preferences)
                             finish()
                         },
                         onEmergencySkip = {
                             decisionMade = true
-                            preferences.completeLatestUnlock(reason, UnlockAction.SKIPPED)
+                            RepositoryScope.launch { repository.completeLatestUnlock(reason, UnlockAction.SKIPPED) }
                             finish()
                         },
                     )
@@ -240,13 +252,14 @@ companion object {
     }
 }
 
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @androidx.compose.runtime.Composable
 private fun InterventionScreen(
     remainingMillis: Long,
     canContinue: Boolean,
     hardModeEnabled: Boolean,
     hideLockOutcomes: Boolean,
+    repository: com.example.doineedto.data.UnlockLogRepository,
     reason: String,
     isRepeatedDistractionReason: Boolean,
     onReasonChanged: (String) -> Unit,
@@ -272,6 +285,7 @@ private fun InterventionScreen(
     val canSubmit = canContinue && isReasonValid && !isRepeatedDistractionReason
     var showMoreContinueReasons by remember { mutableStateOf(false) }
     var showMoreHiddenReasons by remember { mutableStateOf(false) }
+    var longPressedReason by remember { mutableStateOf<String?>(null) }
     BackHandler(enabled = hardModeEnabled) {}
 
     Column(
@@ -299,19 +313,23 @@ private fun InterventionScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     hiddenReasonOptions(showMoreHiddenReasons).forEach { option ->
-                        SuggestionChip(
-                            onClick = {
-                                if (keepLockedReasons.contains(option)) {
-                                    onKeepLockedReasonSelected(option)
-                                } else {
-                                    onCuratedReasonSelected(option)
-                                    coroutineScope.launch {
-                                        scrollState.animateScrollTo(scrollState.maxValue)
+                        Box(
+                            modifier = Modifier.combinedClickable(
+                                onClick = {
+                                    if (keepLockedReasons.contains(option)) {
+                                        onKeepLockedReasonSelected(option)
+                                    } else {
+                                        onCuratedReasonSelected(option)
+                                        coroutineScope.launch {
+                                            scrollState.animateScrollTo(scrollState.maxValue)
+                                        }
                                     }
-                                }
-                            },
-                            label = { Text(option) }
-                        )
+                                },
+                                onLongClick = { longPressedReason = option },
+                            )
+                        ) {
+                            SuggestionChip(onClick = {}, label = { Text(option) })
+                        }
                     }
                 }
                 if (!showMoreHiddenReasons) {
@@ -329,15 +347,19 @@ private fun InterventionScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     visibleContinueReasons(showMoreContinueReasons).forEach { option ->
-                        SuggestionChip(
-                            onClick = {
-                                onCuratedReasonSelected(option)
-                                coroutineScope.launch {
-                                    scrollState.animateScrollTo(scrollState.maxValue)
-                                }
-                            },
-                            label = { Text(option) }
-                        )
+                        Box(
+                            modifier = Modifier.combinedClickable(
+                                onClick = {
+                                    onCuratedReasonSelected(option)
+                                    coroutineScope.launch {
+                                        scrollState.animateScrollTo(scrollState.maxValue)
+                                    }
+                                },
+                                onLongClick = { longPressedReason = option },
+                            )
+                        ) {
+                            SuggestionChip(onClick = {}, label = { Text(option) })
+                        }
                     }
                 }
                 if (!showMoreContinueReasons) {
@@ -354,10 +376,14 @@ private fun InterventionScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     keepLockedReasons.forEach { option ->
-                        SuggestionChip(
-                            onClick = { onKeepLockedReasonSelected(option) },
-                            label = { Text(option) }
-                        )
+                        Box(
+                            modifier = Modifier.combinedClickable(
+                                onClick = { onKeepLockedReasonSelected(option) },
+                                onLongClick = { longPressedReason = option },
+                            )
+                        ) {
+                            SuggestionChip(onClick = {}, label = { Text(option) })
+                        }
                     }
                 }
             }
@@ -414,6 +440,48 @@ private fun InterventionScreen(
             }
         }
     }
+
+    longPressedReason?.let { pressedReason ->
+        ReasonUsageDialog(
+            reason = pressedReason,
+            repository = repository,
+            onDismiss = { longPressedReason = null },
+        )
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun ReasonUsageDialog(
+    reason: String,
+    repository: com.example.doineedto.data.UnlockLogRepository,
+    onDismiss: () -> Unit,
+) {
+    var counts by remember(reason) { mutableStateOf(0 to 0) }
+
+    androidx.compose.runtime.LaunchedEffect(reason) {
+        counts = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val today = repository.countReasonUses(reason, repository.todayStartMillis())
+            val lastHour = repository.countReasonUses(reason, System.currentTimeMillis() - 3_600_000L)
+            today to lastHour
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Uses of \"$reason\"") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Today: ${counts.first}")
+                Text("Last hour: ${counts.second}")
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Dismiss")
+            }
+        }
+    )
 }
 
 @androidx.compose.runtime.Composable

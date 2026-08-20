@@ -8,15 +8,21 @@ import android.content.IntentFilter
 import android.view.accessibility.AccessibilityEvent
 import com.example.doineedto.InterventionActivity
 import com.example.doineedto.data.AppPreferences
+import com.example.doineedto.data.RepositoryScope
+import com.example.doineedto.data.UnlockLogRepository
+import kotlinx.coroutines.launch
 
 class UnlockAccessibilityService : AccessibilityService() {
     private lateinit var preferences: AppPreferences
+    private lateinit var repository: UnlockLogRepository
     private var screenReceiver: BroadcastReceiver? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         activeInstance = this
         preferences = AppPreferences(this)
+        repository = UnlockLogRepository(this)
+        RepositoryScope.launch { repository.migrateFromPreferencesIfNeeded(this@UnlockAccessibilityService) }
         registerScreenReceiver()
     }
 
@@ -24,6 +30,7 @@ class UnlockAccessibilityService : AccessibilityService() {
         val currentPackage = event?.packageName?.toString() ?: return
         if (currentPackage == packageName) return
         if (currentPackage == "com.android.systemui") return
+        if (preferences.isExcludedPackage(currentPackage)) return
         if (!preferences.hasUnlockPending()) return
         if (!preferences.isInterventionAllowedNow()) {
             preferences.clearUnlockPending()
@@ -33,6 +40,7 @@ class UnlockAccessibilityService : AccessibilityService() {
 
         preferences.clearUnlockPending()
         preferences.markInterventionShown()
+        repository.insertPendingBlocking()
         startActivity(InterventionActivity.createIntent(this))
     }
 
@@ -54,7 +62,7 @@ class UnlockAccessibilityService : AccessibilityService() {
                     Intent.ACTION_USER_PRESENT -> preferences.markUnlockPending()
                     Intent.ACTION_SCREEN_OFF -> {
                         preferences.clearUnlockPending()
-                        preferences.clearPendingUnlockLog()
+                        RepositoryScope.launch { repository.clearPendingLog() }
                     }
                 }
             }

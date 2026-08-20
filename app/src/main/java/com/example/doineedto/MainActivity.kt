@@ -48,6 +48,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -70,10 +71,12 @@ import com.example.doineedto.data.LaunchableApp
 import com.example.doineedto.data.PresetTargetCategory
 import com.example.doineedto.data.ScheduleWindow
 import com.example.doineedto.data.UnlockLogEntry
+import com.example.doineedto.data.UnlockLogRepository
 import com.example.doineedto.data.queryLaunchableApps
 import com.example.doineedto.data.UpdateCheckResult
 import com.example.doineedto.service.UnlockAccessibilityService
 import com.example.doineedto.ui.AppTheme
+import com.example.doineedto.work.UpdateScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -97,6 +100,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         preferences = AppPreferences(this)
         updateManager = AppUpdateManager(this)
+        if (preferences.isBackgroundUpdateCheckEnabled()) {
+            UpdateScheduler.schedule(this)
+        } else {
+            UpdateScheduler.cancel(this)
+        }
+        lifecycleScope.launch(Dispatchers.IO) {
+            UnlockLogRepository(this@MainActivity).migrateFromPreferencesIfNeeded(this@MainActivity)
+        }
         refreshUiState()
 
         setContent {
@@ -367,6 +378,7 @@ private fun MainScreen(
         androidx.compose.runtime.mutableStateOf(hasCompletedOnboarding)
     }
     var onboardingStep by rememberSaveable { mutableIntStateOf(0) }
+    var showFullHistory by rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     var selectedTab by rememberSaveable { androidx.compose.runtime.mutableIntStateOf(0) }
     var friction by rememberSaveable(currentFriction) { mutableIntStateOf(currentFriction) }
     var hardMode by rememberSaveable(hardModeEnabled) { androidx.compose.runtime.mutableStateOf(hardModeEnabled) }
@@ -408,6 +420,13 @@ private fun MainScreen(
         return
     }
 
+    if (showFullHistory) {
+        Box(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+            FullHistoryScreen(onBack = { showFullHistory = false })
+        }
+        return
+    }
+
     Scaffold(
         bottomBar = {
             NavigationBar(
@@ -432,6 +451,7 @@ private fun MainScreen(
         if (selectedTab == 0) {
             HomeTab(
                 historyState = historyState,
+                onViewFullHistory = { showFullHistory = true },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
@@ -592,6 +612,7 @@ private fun OnboardingPermissionsScreen(
 @Composable
 private fun HomeTab(
     historyState: HistoryState,
+    onViewFullHistory: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showAllHistory by rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
@@ -660,6 +681,14 @@ private fun HomeTab(
                 ) {
                     Text(stringResourceSafe(R.string.show_more_history))
                 }
+            }
+        }
+        item {
+            TextButton(
+                onClick = onViewFullHistory,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResourceSafe(R.string.view_full_history))
             }
         }
         item {
@@ -757,6 +786,14 @@ private fun MoreTab(
         }
         item {
             SettingsGroup(
+                title = stringResourceSafe(R.string.excluded_apps_title),
+                content = {
+                    ExcludedAppsSection()
+                }
+            )
+        }
+        item {
+            SettingsGroup(
                 title = stringResourceSafe(R.string.updates_title),
                 content = {
                     AppUpdateSection(
@@ -822,6 +859,11 @@ private fun AboutCard(appVersionName: String) {
         ListItem(
             headlineContent = { Text(stringResourceSafe(R.string.about_author_label)) },
             supportingContent = { Text(stringResourceSafe(R.string.about_author_value)) }
+        )
+        HorizontalDivider()
+        ListItem(
+            headlineContent = { Text(stringResourceSafe(R.string.banking_warning_title)) },
+            supportingContent = { Text(stringResourceSafe(R.string.banking_warning_body)) }
         )
     }
 }
@@ -922,6 +964,21 @@ private fun AppTargetChooserDialog(
     onDismiss: () -> Unit,
     onSelect: (LaunchableApp) -> Unit,
 ) {
+    AppPickerDialog(
+        title = "${stringResourceSafe(R.string.choose_app_dialog_title)}: ${category.title}",
+        apps = apps,
+        onDismiss = onDismiss,
+        onSelect = onSelect,
+    )
+}
+
+@Composable
+private fun AppPickerDialog(
+    title: String,
+    apps: List<LaunchableApp>,
+    onDismiss: () -> Unit,
+    onSelect: (LaunchableApp) -> Unit,
+) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val normalizedQuery = searchQuery.trim()
     val filteredApps = remember(apps, normalizedQuery) {
@@ -937,7 +994,7 @@ private fun AppTargetChooserDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("${stringResourceSafe(R.string.choose_app_dialog_title)}: ${category.title}") },
+        title = { Text(title) },
         text = {
             Column(
                 modifier = Modifier
@@ -984,6 +1041,70 @@ private fun AppTargetChooserDialog(
 }
 
 @Composable
+private fun ExcludedAppsSection() {
+    val context = LocalContext.current
+    val preferences = remember(context) { AppPreferences(context) }
+    var showPicker by rememberSaveable { mutableStateOf(false) }
+    var refreshToken by rememberSaveable { mutableIntStateOf(0) }
+    val excludedPackages = remember(refreshToken) { preferences.getExcludedPackages() }
+    val launchableApps = remember(showPicker) { queryLaunchableApps(context) }
+    val labelsByPackage = remember(launchableApps) {
+        launchableApps.associate { it.packageName to it.label }
+    }
+
+    Column {
+        ListItem(
+            headlineContent = { Text(stringResourceSafe(R.string.excluded_apps_description)) },
+            trailingContent = {
+                Button(
+                    onClick = { showPicker = true },
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Text(stringResourceSafe(R.string.add_excluded_app))
+                }
+            }
+        )
+
+        if (excludedPackages.isEmpty()) {
+            HorizontalDivider()
+            ListItem(
+                headlineContent = { Text(stringResourceSafe(R.string.no_excluded_apps)) }
+            )
+        } else {
+            excludedPackages.sorted().forEach { packageName ->
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text(labelsByPackage[packageName] ?: packageName) },
+                    trailingContent = {
+                        TextButton(
+                            onClick = {
+                                preferences.removeExcludedPackage(packageName)
+                                refreshToken += 1
+                            }
+                        ) {
+                            Text(stringResourceSafe(R.string.remove_excluded_app))
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    if (showPicker) {
+        AppPickerDialog(
+            title = stringResourceSafe(R.string.excluded_apps_title),
+            apps = launchableApps,
+            onDismiss = { showPicker = false },
+            onSelect = { app ->
+                preferences.addExcludedPackage(app.packageName)
+                refreshToken += 1
+                showPicker = false
+            }
+        )
+    }
+}
+
+@Composable
 private fun appTargetDescription(category: PresetTargetCategory): String = when (category) {
     PresetTargetCategory.MEMES -> stringResourceSafe(R.string.app_target_memes_description)
     PresetTargetCategory.SOCIAL -> stringResourceSafe(R.string.app_target_social_description)
@@ -1001,6 +1122,12 @@ private fun AppUpdateSection(
     onInstallUpdate: () -> Unit,
     onOpenInstallSettings: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val preferences = remember(context) { AppPreferences(context) }
+    var backgroundCheckEnabled by remember(context) {
+        mutableStateOf(preferences.isBackgroundUpdateCheckEnabled())
+    }
+
     Column {
         ListItem(
             headlineContent = { Text(stringResourceSafe(R.string.updates_title)) },
@@ -1019,6 +1146,25 @@ private fun AppUpdateSection(
                         )
                     )
                 }
+            }
+        )
+        HorizontalDivider()
+        ListItem(
+            headlineContent = { Text(stringResourceSafe(R.string.background_update_check_title)) },
+            supportingContent = { Text(stringResourceSafe(R.string.background_update_check_description)) },
+            trailingContent = {
+                Switch(
+                    checked = backgroundCheckEnabled,
+                    onCheckedChange = { enabled ->
+                        backgroundCheckEnabled = enabled
+                        preferences.setBackgroundUpdateCheckEnabled(enabled)
+                        if (enabled) {
+                            UpdateScheduler.schedule(context)
+                        } else {
+                            UpdateScheduler.cancel(context)
+                        }
+                    }
+                )
             }
         )
 
@@ -1335,16 +1481,22 @@ private fun HeroCard(
 @Composable
 private fun rememberHistoryState(refreshToken: Int): HistoryState {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val preferences = remember(context) { AppPreferences(context) }
-    return remember(preferences, refreshToken) {
-        HistoryState(
-            totalUnlocks = preferences.totalUnlocks(),
-            continuedUnlocks = preferences.continuedUnlocks(),
-            keptLockedUnlocks = preferences.keptLockedUnlocks(),
-            dailyCounts = preferences.getDailyUnlockCounts(),
-            logs = preferences.getUnlockLogs().take(20),
-        )
+    val repository = remember(context) { UnlockLogRepository(context) }
+    var state by remember { mutableStateOf(HistoryState.EMPTY) }
+
+    LaunchedEffect(repository, refreshToken) {
+        state = withContext(Dispatchers.IO) {
+            HistoryState(
+                totalUnlocks = repository.count(),
+                continuedUnlocks = repository.countContinued(),
+                keptLockedUnlocks = repository.countKeptLocked(),
+                dailyCounts = repository.getDailyUnlockCounts(),
+                logs = repository.getRecent(20),
+            )
+        }
     }
+
+    return state
 }
 
 @Composable
@@ -1514,7 +1666,7 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun HistoryCard(log: UnlockLogEntry) {
+internal fun HistoryCard(log: UnlockLogEntry) {
     val formatter = remember { SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()) }
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1546,7 +1698,7 @@ private fun HistoryCard(log: UnlockLogEntry) {
     }
 }
 
-private fun actionLabel(action: String): String = when (action) {
+internal fun actionLabel(action: String): String = when (action) {
     "continue" -> "Continued"
     "keep_locked" -> "Stopped"
     "skipped" -> "Skipped"
@@ -1559,7 +1711,17 @@ private data class HistoryState(
     val keptLockedUnlocks: Int,
     val dailyCounts: List<DailyUnlockCount>,
     val logs: List<UnlockLogEntry>,
-)
+) {
+    companion object {
+        val EMPTY = HistoryState(
+            totalUnlocks = 0,
+            continuedUnlocks = 0,
+            keptLockedUnlocks = 0,
+            dailyCounts = emptyList(),
+            logs = emptyList(),
+        )
+    }
+}
 
 private data class MainUiState(
     val friction: Int = 40,
