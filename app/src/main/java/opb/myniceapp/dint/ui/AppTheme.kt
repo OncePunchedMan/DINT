@@ -1,12 +1,20 @@
 package opb.myniceapp.dint.ui
 
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.googlefonts.Font
+import androidx.compose.ui.text.googlefonts.GoogleFont
+import opb.myniceapp.dint.R
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFF2F5D50),
@@ -52,11 +60,43 @@ private val DarkColors = darkColorScheme(
     outline = Color(0xFF989082)
 )
 
+private val googleFontProvider = GoogleFont.Provider(
+    providerAuthority = "com.google.android.gms.fonts",
+    providerPackage = "com.google.android.gms",
+    certificates = R.array.com_google_android_gms_fonts_certs
+)
+
+private val displayFontFamily = FontFamily(
+    Font(GoogleFont("Fraunces"), googleFontProvider)
+)
+
+// Display font is scoped to display*/headlineLarge/headlineMedium only — the two places a
+// one-off headline appears (HeroCard titles, the intervention PromptTitle). headlineSmall and
+// everything smaller/more frequent (stat values, chip labels, list items) stay on the system
+// font so a downloadable-font load never flickers visible, high-churn text.
+val AppTypography: Typography = Typography().let { base ->
+    base.copy(
+        displayLarge = base.displayLarge.copy(fontFamily = displayFontFamily),
+        displayMedium = base.displayMedium.copy(fontFamily = displayFontFamily),
+        displaySmall = base.displaySmall.copy(fontFamily = displayFontFamily),
+        headlineLarge = base.headlineLarge.copy(fontFamily = displayFontFamily),
+        headlineMedium = base.headlineMedium.copy(fontFamily = displayFontFamily),
+    )
+}
+
 @Composable
 fun AppTheme(content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val darkTheme = isSystemInDarkTheme()
+    val colorScheme = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        darkTheme -> DarkColors
+        else -> LightColors
+    }
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
-        typography = Typography(),
+        colorScheme = colorScheme,
+        typography = AppTypography,
         content = content
     )
 }

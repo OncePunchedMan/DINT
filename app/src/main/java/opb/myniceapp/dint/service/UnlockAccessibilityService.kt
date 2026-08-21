@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.view.accessibility.AccessibilityEvent
 import opb.myniceapp.dint.InterventionActivity
 import opb.myniceapp.dint.data.AppPreferences
@@ -16,20 +17,31 @@ class UnlockAccessibilityService : AccessibilityService() {
     private lateinit var preferences: AppPreferences
     private lateinit var repository: UnlockLogRepository
     private var screenReceiver: BroadcastReceiver? = null
+    private var homePackageName: String? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         activeInstance = this
         preferences = AppPreferences(this)
         repository = UnlockLogRepository(this)
+        homePackageName = resolveHomePackageName()
         RepositoryScope.launch { repository.migrateFromPreferencesIfNeeded(this@UnlockAccessibilityService) }
         registerScreenReceiver()
+    }
+
+    private fun resolveHomePackageName(): String? {
+        val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        return packageManager.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            ?.activityInfo?.packageName
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val currentPackage = event?.packageName?.toString() ?: return
         if (currentPackage == packageName) return
         if (currentPackage == "com.android.systemui") return
+        // Unlocking almost always resurfaces the home launcher first, which would otherwise
+        // consume the one-shot unlock-pending flag before the user opens the app they meant to.
+        if (currentPackage == homePackageName) return
         if (preferences.isExcludedPackage(currentPackage)) return
         if (!preferences.hasUnlockPending()) return
         if (!preferences.isInterventionAllowedNow()) {

@@ -1,5 +1,6 @@
 package opb.myniceapp.dint.ui.home
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,13 +8,22 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.HealthAndSafety
+import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -56,6 +67,7 @@ fun HomeTab(
         item {
             SettingsGroup(
                 title = stringResource(R.string.home_why_title),
+                icon = Icons.Outlined.Lightbulb,
                 content = {
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.home_why_title)) },
@@ -67,6 +79,7 @@ fun HomeTab(
         item {
             SettingsGroup(
                 title = stringResource(R.string.emergency_title),
+                icon = Icons.Outlined.HealthAndSafety,
                 content = {
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.emergency_title)) },
@@ -136,19 +149,29 @@ private fun StatsSection(
     val visibleDailyCounts = if (showAllDays) dailyCounts else dailyCounts.take(3)
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = stringResource(R.string.stats_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(
+                imageVector = Icons.Outlined.Insights,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = stringResource(R.string.stats_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatCard(stringResource(R.string.stat_label_unlocks), totalUnlocks.toString(), Modifier.weight(1f))
-            StatCard(stringResource(R.string.stat_label_continued), continuedUnlocks.toString(), Modifier.weight(1f))
-            StatCard(stringResource(R.string.stat_label_stopped), keptLockedUnlocks.toString(), Modifier.weight(1f))
+            StatCard(stringResource(R.string.stat_label_unlocks), totalUnlocks.toString(), Icons.Outlined.LockOpen, Modifier.weight(1f))
+            StatCard(stringResource(R.string.stat_label_continued), continuedUnlocks.toString(), Icons.Outlined.CheckCircle, Modifier.weight(1f))
+            StatCard(stringResource(R.string.stat_label_stopped), keptLockedUnlocks.toString(), Icons.Outlined.Lock, Modifier.weight(1f))
         }
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
@@ -182,7 +205,7 @@ private fun StatsSection(
 }
 
 @Composable
-private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
+private fun StatCard(label: String, value: String, icon: ImageVector, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(24.dp),
@@ -191,6 +214,12 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
         )
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(18.dp),
+            )
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
