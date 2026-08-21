@@ -202,7 +202,7 @@ fun PauseStrengthRow(
 
 fun frictionDescription(friction: Int): String = when {
     friction < 25 -> "Light pause: a quick reflection and a short wait."
-    friction < 50 -> "Balanced pause: enough time to notice the urge."
-    friction < 75 -> "Strong pause: a longer wait before continuing."
-    else -> "Heavy pause: the phone should stay closed unless you really mean it."
+    friction < 50 -> "Balanced pause: enough time to notice the urge. (4s)"
+    friction < 75 -> "Strong pause: a longer wait before continuing. (8s)"
+    else -> "Heavy pause: the phone should stay closed unless you really mean it. (12s)"
 }
