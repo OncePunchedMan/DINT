@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.SelfImprovement
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
@@ -30,6 +32,7 @@ fun OnboardingIntroScreen(
             HeroCard(
                 title = stringResource(R.string.onboarding_title),
                 body = stringResource(R.string.onboarding_intro),
+                icon = Icons.Outlined.SelfImprovement,
             )
             SettingsGroup(
                 title = stringResource(R.string.onboarding_how_title),
@@ -82,6 +85,7 @@ fun OnboardingPermissionsScreen(
                 title = stringResource(R.string.onboarding_permissions_title),
                 body = stringResource(R.string.onboarding_permissions_body),
                 compact = true,
+                icon = Icons.Outlined.SelfImprovement,
             )
             SettingsGroup(
                 title = stringResource(R.string.more_permissions),

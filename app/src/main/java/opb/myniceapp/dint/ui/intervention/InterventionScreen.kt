@@ -1,25 +1,33 @@
 package opb.myniceapp.dint.ui.intervention
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.SelfImprovement
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,6 +38,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -97,6 +106,7 @@ fun InterventionScreen(
                     style = MaterialTheme.typography.titleSmall
                 )
                 FlowRow(
+                    modifier = Modifier.animateContentSize(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -134,6 +144,7 @@ fun InterventionScreen(
                     style = MaterialTheme.typography.titleSmall
                 )
                 FlowRow(
+                    modifier = Modifier.animateContentSize(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -298,21 +309,34 @@ private fun PromptTitle(onEmergencySkip: () -> Unit) {
         append(suffix)
     }
 
-    ClickableText(
-        text = promptTitle,
-        style = MaterialTheme.typography.headlineMedium.copy(
-            color = MaterialTheme.colorScheme.onBackground
-        ),
-        onClick = { offset ->
-            promptTitle.getStringAnnotations(
-                tag = emergencyTag,
-                start = offset,
-                end = offset,
-            ).firstOrNull()?.let {
-                onEmergencySkip()
-            }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.tertiaryContainer,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.SelfImprovement,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.padding(8.dp).size(24.dp),
+            )
         }
-    )
+        ClickableText(
+            text = promptTitle,
+            style = MaterialTheme.typography.headlineMedium.copy(
+                color = MaterialTheme.colorScheme.onBackground
+            ),
+            onClick = { offset ->
+                promptTitle.getStringAnnotations(
+                    tag = emergencyTag,
+                    start = offset,
+                    end = offset,
+                ).firstOrNull()?.let {
+                    onEmergencySkip()
+                }
+            }
+        )
+    }
 }
 
 private fun visibleContinueReasons(showMore: Boolean): List<String> =

@@ -4,6 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.PlaylistRemove
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.SystemUpdate
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +63,7 @@ fun MoreTab(
         item {
             SettingsGroup(
                 title = stringResource(R.string.more_settings),
+                icon = Icons.Outlined.Tune,
                 content = {
                     PauseStrengthRow(
                         friction = uiState.friction,
@@ -85,6 +94,7 @@ fun MoreTab(
                         subtitle = stringResource(R.string.preview_intervention_description),
                         buttonLabel = stringResource(R.string.preview_intervention),
                         onClick = onPreviewIntervention,
+                        icon = Icons.Outlined.Visibility,
                     )
                 }
             )
@@ -92,6 +102,7 @@ fun MoreTab(
         item {
             SettingsGroup(
                 title = stringResource(R.string.app_targets_title),
+                icon = Icons.Outlined.Apps,
                 content = {
                     AppLaunchTargetsSection(
                         selections = uiState.appTargetSelections,
@@ -105,6 +116,7 @@ fun MoreTab(
         item {
             SettingsGroup(
                 title = stringResource(R.string.excluded_apps_title),
+                icon = Icons.Outlined.PlaylistRemove,
                 content = {
                     ExcludedAppsSection(
                         excludedPackages = uiState.excludedPackages,
@@ -118,6 +130,7 @@ fun MoreTab(
         item {
             SettingsGroup(
                 title = stringResource(R.string.updates_title),
+                icon = Icons.Outlined.SystemUpdate,
                 content = {
                     AppUpdateSection(
                         state = updateUiState,
@@ -134,6 +147,7 @@ fun MoreTab(
             item {
                 SettingsGroup(
                     title = stringResource(R.string.more_permissions),
+                    icon = Icons.Outlined.Shield,
                     content = {
                         PermissionSetupSection(
                             isBatteryOptimizationIgnored = uiState.isBatteryOptimizationIgnored,
@@ -153,6 +167,7 @@ fun MoreTab(
         item {
             SettingsGroup(
                 title = stringResource(R.string.about_title),
+                icon = Icons.Outlined.Info,
                 content = {
                     AboutCard(appVersionName = uiState.appVersionName)
                 }
