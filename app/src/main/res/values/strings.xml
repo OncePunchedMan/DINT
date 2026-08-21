@@ -20,7 +20,7 @@
     <string name="reason_usage_dialog_title">Uses of \"%1$s\"</string>
     <string name="reason_usage_today">Today: %1$d</string>
     <string name="reason_usage_last_hour">Last hour: %1$d</string>
-    <string name="prompt_title_prefix">Why are you opening your phone right </string>
+    <string name="prompt_title_prefix">"Why are you opening your phone right "</string>
     <string name="prompt_title_now">now</string>
     <string name="prompt_title_suffix">?</string>
     <string name="home_title">Dint - Do I Need To?</string>
