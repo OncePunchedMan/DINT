@@ -2,8 +2,12 @@ package opb.myniceapp.dint.ui.settings
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -81,8 +85,6 @@ fun PermissionSetupSection(
     showLockAction: Boolean = true,
 ) {
     Column {
-        var hasPreviousItem = false
-
         if (!isBatteryOptimizationIgnored) {
             ActionRow(
                 title = stringResource(R.string.disable_battery_optimization),
@@ -90,79 +92,60 @@ fun PermissionSetupSection(
                 buttonLabel = stringResource(R.string.open_settings),
                 onClick = onRequestDisableBatteryOptimization,
             )
-            hasPreviousItem = true
-        } else if (!showLockAction) {
-            ActionRow(
+        } else {
+            GrantedRow(
                 title = stringResource(R.string.disable_battery_optimization),
                 subtitle = stringResource(R.string.battery_optimization_disabled),
-                buttonLabel = stringResource(R.string.granted_label),
-                onClick = {},
-                enabled = false,
             )
-            hasPreviousItem = true
         }
+
+        HorizontalDivider()
         if (!areNotificationsEnabled) {
-            if (hasPreviousItem) HorizontalDivider()
             ActionRow(
                 title = stringResource(R.string.enable_notifications),
                 subtitle = stringResource(R.string.setup_notifications_description),
                 buttonLabel = stringResource(R.string.open_settings),
                 onClick = onRequestNotificationPermission,
             )
-            hasPreviousItem = true
-        } else if (!showLockAction) {
-            if (hasPreviousItem) HorizontalDivider()
-            ActionRow(
+        } else {
+            GrantedRow(
                 title = stringResource(R.string.enable_notifications),
                 subtitle = stringResource(R.string.notifications_enabled),
-                buttonLabel = stringResource(R.string.granted_label),
-                onClick = {},
-                enabled = false,
             )
-            hasPreviousItem = true
         }
+
+        HorizontalDivider()
         if (!isAccessibilityEnabled) {
-            if (hasPreviousItem) HorizontalDivider()
             ActionRow(
                 title = stringResource(R.string.enable_accessibility),
                 subtitle = stringResource(R.string.enable_accessibility_description),
                 buttonLabel = stringResource(R.string.open_settings),
                 onClick = onOpenAccessibilitySettings,
             )
-            hasPreviousItem = true
-        } else if (!showLockAction) {
-            if (hasPreviousItem) HorizontalDivider()
-            ActionRow(
+        } else {
+            GrantedRow(
                 title = stringResource(R.string.enable_accessibility),
                 subtitle = stringResource(R.string.granted_accessibility_description),
-                buttonLabel = stringResource(R.string.granted_label),
-                onClick = {},
-                enabled = false,
             )
-            hasPreviousItem = true
         }
+
+        HorizontalDivider()
         if (!isDeviceAdminEnabled) {
-            if (hasPreviousItem) HorizontalDivider()
             ActionRow(
                 title = stringResource(R.string.enable_device_admin),
                 subtitle = stringResource(R.string.enable_device_admin_description),
                 buttonLabel = stringResource(R.string.open_settings),
                 onClick = onOpenDeviceAdminSettings,
             )
-            hasPreviousItem = true
-        } else if (!showLockAction) {
-            if (hasPreviousItem) HorizontalDivider()
-            ActionRow(
+        } else {
+            GrantedRow(
                 title = stringResource(R.string.enable_device_admin),
                 subtitle = stringResource(R.string.device_admin_enabled),
-                buttonLabel = stringResource(R.string.granted_label),
-                onClick = {},
-                enabled = false,
             )
-            hasPreviousItem = true
         }
+
         if (isDeviceAdminEnabled && showLockAction) {
-            if (hasPreviousItem) HorizontalDivider()
+            HorizontalDivider()
             ActionRow(
                 title = stringResource(R.string.lock_now),
                 subtitle = stringResource(R.string.lock_now_description),
@@ -171,6 +154,22 @@ fun PermissionSetupSection(
             )
         }
     }
+}
+
+@Composable
+private fun GrantedRow(title: String, subtitle: String) {
+    ListItem(
+        headlineContent = { Text(title) },
+        supportingContent = { Text(subtitle) },
+        trailingContent = {
+        Icon(
+            imageVector = Icons.Outlined.CheckCircle,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.offset(x = (-30).dp),
+            )
+        }
+    )
 }
 
 @Composable
@@ -188,6 +187,7 @@ fun PauseStrengthRow(
             value = friction.toFloat(),
             onValueChange = { onFrictionChanged(it.toInt()) },
             valueRange = 0f..100f,
+            steps = 2,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),

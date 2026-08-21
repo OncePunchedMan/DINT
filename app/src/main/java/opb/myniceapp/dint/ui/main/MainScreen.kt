@@ -46,7 +46,12 @@ import opb.myniceapp.dint.ui.onboarding.OnboardingIntroScreen
 import opb.myniceapp.dint.ui.onboarding.OnboardingPermissionsScreen
 import opb.myniceapp.dint.ui.settings.MoreTab
 import opb.myniceapp.dint.ui.settings.ScheduleTimeField
+import opb.myniceapp.dint.ui.settings.SettingsPermissionsScreen
+import opb.myniceapp.dint.ui.settings.SettingsShortcutsScreen
+import opb.myniceapp.dint.ui.settings.SettingsUiScreen
 import opb.myniceapp.dint.ui.settings.frictionDescription
+
+private enum class MainSubScreen { None, FullHistory, SettingsUi, SettingsShortcuts, SettingsPermissions }
 
 @Composable
 fun MainScreen(
@@ -65,7 +70,7 @@ fun MainScreen(
     val historyState by viewModel.historyState.collectAsStateWithLifecycle()
 
     var onboardingStep by rememberSaveable { mutableIntStateOf(0) }
-    var showFullHistory by rememberSaveable { mutableStateOf(false) }
+    var activeSubScreen by rememberSaveable { mutableStateOf(MainSubScreen.None) }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val frictionLabel = remember(uiState.friction) { frictionDescription(uiState.friction) }
 
@@ -107,84 +112,113 @@ fun MainScreen(
         return
     }
 
-    if (showFullHistory) {
-        Box(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-            FullHistoryScreen(onBack = { showFullHistory = false })
+    when (activeSubScreen) {
+        MainSubScreen.FullHistory -> Box(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+            FullHistoryScreen(onBack = { activeSubScreen = MainSubScreen.None })
         }
-        return
-    }
-
-    Scaffold(
-        bottomBar = {
-            NavigationBar(
-                modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)),
-                tonalElevation = 10.dp,
-                containerColor = MaterialTheme.colorScheme.surface,
-            ) {
-                NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    icon = {
-                        Icon(
-                            imageVector = if (selectedTab == 0) Icons.Filled.Home else Icons.Outlined.Home,
-                            contentDescription = null,
-                        )
-                    },
-                    label = { Text(stringResource(R.string.nav_home)) }
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    icon = {
-                        Icon(
-                            imageVector = if (selectedTab == 1) Icons.Filled.Settings else Icons.Outlined.Settings,
-                            contentDescription = null,
-                        )
-                    },
-                    label = { Text(stringResource(R.string.nav_more)) }
-                )
+        MainSubScreen.SettingsUi -> Box(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+            SettingsUiScreen(
+                friction = uiState.friction,
+                frictionLabel = frictionLabel,
+                onFrictionChanged = viewModel::onFrictionChanged,
+                scheduleEnabled = uiState.scheduleWindow.isEnabled,
+                scheduleStartMinutes = uiState.scheduleWindow.startMinutes,
+                scheduleEndMinutes = uiState.scheduleWindow.endMinutes,
+                onScheduleEnabledChanged = viewModel::onScheduleEnabledChanged,
+                onRequestTimePicker = onRequestTimePicker,
+                hardModeEnabled = uiState.hardModeEnabled,
+                onHardModeChanged = viewModel::onHardModeChanged,
+                hideLockOutcomes = uiState.hideLockOutcomes,
+                onHiddenOutcomesChanged = viewModel::onHideLockOutcomesChanged,
+                onPreviewIntervention = onPreviewIntervention,
+                onBack = { activeSubScreen = MainSubScreen.None },
+            )
+        }
+        MainSubScreen.SettingsShortcuts -> Box(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+            SettingsShortcutsScreen(
+                uiState = uiState,
+                onExcludedAppAdded = viewModel::onExcludedAppAdded,
+                onExcludedAppRemoved = viewModel::onExcludedAppRemoved,
+                onAppTargetSelected = viewModel::onAppTargetSelected,
+                onAppTargetCleared = viewModel::onAppTargetCleared,
+                onBack = { activeSubScreen = MainSubScreen.None },
+            )
+        }
+        MainSubScreen.SettingsPermissions -> Box(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+            SettingsPermissionsScreen(
+                isBatteryOptimizationIgnored = uiState.isBatteryOptimizationIgnored,
+                onRequestDisableBatteryOptimization = onRequestDisableBatteryOptimization,
+                areNotificationsEnabled = uiState.areNotificationsEnabled,
+                onRequestNotificationPermission = onRequestNotificationPermission,
+                isAccessibilityEnabled = uiState.isAccessibilityEnabled,
+                onOpenAccessibilitySettings = onOpenAccessibilitySettings,
+                isDeviceAdminEnabled = uiState.isDeviceAdminEnabled,
+                onOpenDeviceAdminSettings = onOpenDeviceAdminSettings,
+                onLockNow = onLockNow,
+                onBack = { activeSubScreen = MainSubScreen.None },
+            )
+        }
+        MainSubScreen.None -> Scaffold(
+            bottomBar = {
+                NavigationBar(
+                    modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)),
+                    tonalElevation = 10.dp,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ) {
+                    NavigationBarItem(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        icon = {
+                            Icon(
+                                imageVector = if (selectedTab == 0) Icons.Filled.Home else Icons.Outlined.Home,
+                                contentDescription = null,
+                            )
+                        },
+                        label = { Text(stringResource(R.string.nav_home)) }
+                    )
+                    NavigationBarItem(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        icon = {
+                            Icon(
+                                imageVector = if (selectedTab == 1) Icons.Filled.Settings else Icons.Outlined.Settings,
+                                contentDescription = null,
+                            )
+                        },
+                        label = { Text(stringResource(R.string.nav_more)) }
+                    )
+                }
             }
-        }
-    ) { innerPadding ->
-        Crossfade(targetState = selectedTab, label = "main_tab") { tab ->
-            if (tab == 0) {
-                HomeTab(
-                    historyState = historyState,
-                    onViewFullHistory = { showFullHistory = true },
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .padding(24.dp)
-                )
-            } else {
-                MoreTab(
-                    uiState = uiState,
-                    frictionLabel = frictionLabel,
-                    onFrictionChanged = viewModel::onFrictionChanged,
-                    onScheduleEnabledChanged = viewModel::onScheduleEnabledChanged,
-                    onRequestTimePicker = onRequestTimePicker,
-                    onHardModeChanged = viewModel::onHardModeChanged,
-                    onHiddenOutcomesChanged = viewModel::onHideLockOutcomesChanged,
-                    onRequestDisableBatteryOptimization = onRequestDisableBatteryOptimization,
-                    onRequestNotificationPermission = onRequestNotificationPermission,
-                    onOpenAccessibilitySettings = onOpenAccessibilitySettings,
-                    onOpenDeviceAdminSettings = onOpenDeviceAdminSettings,
-                    onLockNow = onLockNow,
-                    onPreviewIntervention = onPreviewIntervention,
-                    updateUiState = updateState,
-                    onCheckForUpdate = viewModel::checkForUpdate,
-                    onInstallUpdate = viewModel::installUpdate,
-                    onOpenInstallSettings = onOpenInstallSettings,
-                    onBackgroundUpdateCheckToggled = viewModel::onBackgroundUpdateCheckToggled,
-                    onExcludedAppAdded = viewModel::onExcludedAppAdded,
-                    onExcludedAppRemoved = viewModel::onExcludedAppRemoved,
-                    onAppTargetSelected = viewModel::onAppTargetSelected,
-                    onAppTargetCleared = viewModel::onAppTargetCleared,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .padding(24.dp)
-                )
+        ) { innerPadding ->
+            Crossfade(targetState = selectedTab, label = "main_tab") { tab ->
+                if (tab == 0) {
+                    HomeTab(
+                        historyState = historyState,
+                        onViewFullHistory = { activeSubScreen = MainSubScreen.FullHistory },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .padding(24.dp)
+                    )
+                } else {
+                    MoreTab(
+                        appVersionName = uiState.appVersionName,
+                        shouldShowPermissionSetup = uiState.shouldShowPermissionSetup,
+                        updateUiState = updateState,
+                        backgroundUpdateCheckEnabled = uiState.backgroundUpdateCheckEnabled,
+                        onCheckForUpdate = viewModel::checkForUpdate,
+                        onInstallUpdate = viewModel::installUpdate,
+                        onOpenInstallSettings = onOpenInstallSettings,
+                        onBackgroundUpdateCheckToggled = viewModel::onBackgroundUpdateCheckToggled,
+                        onNavigateToUi = { activeSubScreen = MainSubScreen.SettingsUi },
+                        onNavigateToShortcuts = { activeSubScreen = MainSubScreen.SettingsShortcuts },
+                        onNavigateToPermissions = { activeSubScreen = MainSubScreen.SettingsPermissions },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .padding(24.dp)
+                    )
+                }
             }
         }
     }

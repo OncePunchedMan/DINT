@@ -44,8 +44,13 @@
     <string name="onboarding_finish">Open Dint</string>
     <string name="intent_pause_title">Pause before unlock</string>
     <string name="more_intro">Permissions, reminders, and behavior settings live here.</string>
-    <string name="more_settings">Settings</string>
+    <string name="more_settings">General</string>
+    <string name="settings_ui_subtitle">Pause strength, schedule, hard mode</string>
+    <string name="settings_shortcuts_title">App shortcuts and Exclusions</string>
+    <string name="settings_shortcuts_subtitle">Preset shortcuts and excluded apps</string>
     <string name="more_permissions">Permissions</string>
+    <string name="permissions_status_needed">Setup needed</string>
+    <string name="permissions_status_ok">All set</string>
     <string name="about_title">About</string>
     <string name="app_targets_title">Preset app shortcuts</string>
     <string name="app_targets_description">Choose which app Dint should open after you continue with broader presets like memes, news, music, or shopping.</string>
@@ -102,7 +107,7 @@
     <string name="banking_warning_title">Why do banking apps warn about this?</string>
     <string name="banking_warning_body">Android tells apps whenever any accessibility service is turned on for the device, not just what that service actually does. Some banking and wallet apps show a warning any time an accessibility service is enabled, including Dint\'s. This is normal Android behavior and outside Dint\'s control.</string>
     <string name="nav_home">Home</string>
-    <string name="nav_more">More</string>
+    <string name="nav_more">Settings</string>
     <string name="hard_mode_title">Hard mode</string>
     <string name="hard_mode_description">Require a full-screen decision before using the device. The reminder cannot just be backed out of.</string>
     <string name="hard_mode_on">Hard mode is active.</string>
@@ -121,7 +126,7 @@
     <string name="notifications_enabled">Notifications enabled</string>
     <string name="granted_label">Granted</string>
     <string name="granted_accessibility_description">Accessibility access is enabled for Dint.</string>
-    <string name="open_settings">Open</string>
+    <string name="open_settings">Grant</string>
     <string name="lock_now">Lock device now</string>
     <string name="lock_now_description">Immediately lock the device when device admin is enabled.</string>
     <string name="schedule_title">When Dint steps in</string>

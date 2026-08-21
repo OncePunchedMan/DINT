@@ -2,14 +2,11 @@ package opb.myniceapp.dint.ui.history
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -20,6 +17,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import opb.myniceapp.dint.DintApplication
 import opb.myniceapp.dint.R
+import opb.myniceapp.dint.ui.common.SubPageHeader
 import opb.myniceapp.dint.ui.home.HistoryCard
 
 @Composable
@@ -32,18 +30,7 @@ fun FullHistoryScreen(onBack: () -> Unit) {
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = stringResource(R.string.full_history_title),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            TextButton(onClick = onBack) {
-                Text(stringResource(R.string.back))
-            }
-        }
+        SubPageHeader(title = stringResource(R.string.full_history_title), onBack = onBack)
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(entries) { entry ->
