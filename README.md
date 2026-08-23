@@ -1,7 +1,3 @@
-| Release Builds | Dint Support Server |
-|-------|----------|
-| [![stable release](https://img.shields.io/github/release/OncePunchedMan/DINT.svg?maxAge=3600&label=download)](https://github.com/OncePunchedMan/DINT/releases/latest) | [![Discord](https://img.shields.io/discord/1195734228319617024.svg?label=discord&labelColor=7289da&color=2c2f33&style=flat)](TBD) |
-
 # ![app icon](./.github/readme-images/app-icon.png) Dint — Do I Need To?
 
 Do you find yourself pointlessly unlocking your phone, thinking to yourself: "Hey, why did I just do that?" That's why I created Dint. It makes you pause and asks you why you just unlocked your phone. 
