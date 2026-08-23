@@ -47,14 +47,14 @@ jobs:
         run: bash ./gradlew :app:assembleRelease
         env:
           DINT_VERSION_CODE: ${{ github.run_number }}
-          DINT_VERSION_NAME: 0.0.1.${{ github.run_number }}
+          DINT_VERSION_NAME: 0.9.${{ github.run_number }}
           DINT_KEYSTORE_PASSWORD: ${{ secrets.DINT_KEYSTORE_PASSWORD }}
           DINT_KEY_ALIAS: ${{ secrets.DINT_KEY_ALIAS }}
           DINT_KEY_PASSWORD: ${{ secrets.DINT_KEY_PASSWORD }}
 
       - name: Rename APK
         run: |
-          VERSION_NAME="0.0.1.${GITHUB_RUN_NUMBER}"
+          VERSION_NAME="0.9.${GITHUB_RUN_NUMBER}"
           mkdir -p release
           SOURCE_APK="app/build/outputs/apk/release/app-release.apk"
           if [ ! -f "$SOURCE_APK" ]; then
@@ -72,7 +72,7 @@ jobs:
       - name: Create GitHub release on master
         if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' }}
         run: |
-          VERSION_NAME="0.0.1.${GITHUB_RUN_NUMBER}"
+          VERSION_NAME="0.9.${GITHUB_RUN_NUMBER}"
           VERSION_CODE="${GITHUB_RUN_NUMBER}"
           TAG="${{ inputs.release_tag }}"
           if [ -z "$TAG" ]; then
