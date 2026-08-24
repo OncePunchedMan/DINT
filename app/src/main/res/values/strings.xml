@@ -84,6 +84,7 @@
     <string name="update_install_permission_title">Install unknown apps</string>
     <string name="update_install_permission_description">Android may require you to allow Dint to install APKs before the update prompt can open.</string>
     <string name="update_install_permission_needed">Allow Dint to install unknown apps, then tap Install again.</string>
+    <string name="update_install_permission_granted">Dint can install app updates</string>
     <string name="update_check_failed">Update check failed: %1$s</string>
     <string name="update_install_failed">Update install failed: %1$s</string>
     <string name="background_update_check_title">Check for updates automatically</string>

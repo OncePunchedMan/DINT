@@ -83,6 +83,9 @@ fun PermissionSetupSection(
     onOpenDeviceAdminSettings: () -> Unit,
     onLockNow: () -> Unit,
     showLockAction: Boolean = true,
+    isInstallPermissionGranted: Boolean = true,
+    onOpenInstallSettings: () -> Unit = {},
+    showInstallPermissionRow: Boolean = true,
 ) {
     Column {
         if (!isBatteryOptimizationIgnored) {
@@ -142,6 +145,23 @@ fun PermissionSetupSection(
                 title = stringResource(R.string.enable_device_admin),
                 subtitle = stringResource(R.string.device_admin_enabled),
             )
+        }
+
+        if (showInstallPermissionRow) {
+            HorizontalDivider()
+            if (!isInstallPermissionGranted) {
+                ActionRow(
+                    title = stringResource(R.string.update_install_permission_title),
+                    subtitle = stringResource(R.string.update_install_permission_description),
+                    buttonLabel = stringResource(R.string.open_settings),
+                    onClick = onOpenInstallSettings,
+                )
+            } else {
+                GrantedRow(
+                    title = stringResource(R.string.update_install_permission_title),
+                    subtitle = stringResource(R.string.update_install_permission_granted),
+                )
+            }
         }
 
         if (isDeviceAdminEnabled && showLockAction) {

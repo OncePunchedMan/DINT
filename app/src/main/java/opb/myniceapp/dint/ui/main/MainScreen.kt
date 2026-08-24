@@ -1,5 +1,6 @@
 package opb.myniceapp.dint.ui.main
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -112,6 +113,14 @@ fun MainScreen(
         return
     }
 
+    BackHandler(enabled = activeSubScreen != MainSubScreen.None || selectedTab != 0) {
+        if (activeSubScreen != MainSubScreen.None) {
+            activeSubScreen = MainSubScreen.None
+        } else {
+            selectedTab = 0
+        }
+    }
+
     when (activeSubScreen) {
         MainSubScreen.FullHistory -> Box(modifier = Modifier.fillMaxSize().padding(24.dp)) {
             FullHistoryScreen(onBack = { activeSubScreen = MainSubScreen.None })
@@ -154,6 +163,8 @@ fun MainScreen(
                 onOpenAccessibilitySettings = onOpenAccessibilitySettings,
                 isDeviceAdminEnabled = uiState.isDeviceAdminEnabled,
                 onOpenDeviceAdminSettings = onOpenDeviceAdminSettings,
+                isInstallPermissionGranted = uiState.canRequestPackageInstalls,
+                onOpenInstallSettings = onOpenInstallSettings,
                 onLockNow = onLockNow,
                 onBack = { activeSubScreen = MainSubScreen.None },
             )
@@ -208,7 +219,6 @@ fun MainScreen(
                         backgroundUpdateCheckEnabled = uiState.backgroundUpdateCheckEnabled,
                         onCheckForUpdate = viewModel::checkForUpdate,
                         onInstallUpdate = viewModel::installUpdate,
-                        onOpenInstallSettings = onOpenInstallSettings,
                         onBackgroundUpdateCheckToggled = viewModel::onBackgroundUpdateCheckToggled,
                         onNavigateToUi = { activeSubScreen = MainSubScreen.SettingsUi },
                         onNavigateToShortcuts = { activeSubScreen = MainSubScreen.SettingsShortcuts },
