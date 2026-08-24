@@ -12,7 +12,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import opb.myniceapp.dint.R
-import opb.myniceapp.dint.ui.common.ActionRow
 import opb.myniceapp.dint.ui.main.UpdateUiState
 
 @Composable
@@ -21,7 +20,6 @@ fun AppUpdateSection(
     backgroundCheckEnabled: Boolean,
     onCheckForUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
-    onOpenInstallSettings: () -> Unit,
     onBackgroundCheckToggled: (Boolean) -> Unit,
 ) {
     Column {
@@ -81,13 +79,6 @@ fun AppUpdateSection(
                         )
                     }
                 }
-            )
-            HorizontalDivider()
-            ActionRow(
-                title = stringResource(R.string.update_install_permission_title),
-                subtitle = stringResource(R.string.update_install_permission_description),
-                buttonLabel = stringResource(R.string.open_settings),
-                onClick = onOpenInstallSettings,
             )
         }
     }

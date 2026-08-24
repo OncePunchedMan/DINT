@@ -101,6 +101,7 @@ fun OnboardingPermissionsScreen(
                         onOpenDeviceAdminSettings = onOpenDeviceAdminSettings,
                         onLockNow = {},
                         showLockAction = false,
+                        showInstallPermissionRow = false,
                     )
                 }
             )

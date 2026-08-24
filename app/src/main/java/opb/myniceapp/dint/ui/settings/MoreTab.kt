@@ -41,7 +41,6 @@ fun MoreTab(
     backgroundUpdateCheckEnabled: Boolean,
     onCheckForUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
-    onOpenInstallSettings: () -> Unit,
     onBackgroundUpdateCheckToggled: (Boolean) -> Unit,
     onNavigateToUi: () -> Unit,
     onNavigateToShortcuts: () -> Unit,
@@ -92,7 +91,6 @@ fun MoreTab(
                         backgroundCheckEnabled = backgroundUpdateCheckEnabled,
                         onCheckForUpdate = onCheckForUpdate,
                         onInstallUpdate = onInstallUpdate,
-                        onOpenInstallSettings = onOpenInstallSettings,
                         onBackgroundCheckToggled = onBackgroundUpdateCheckToggled,
                     )
                 }

@@ -23,6 +23,8 @@ fun SettingsPermissionsScreen(
     onOpenAccessibilitySettings: () -> Unit,
     isDeviceAdminEnabled: Boolean,
     onOpenDeviceAdminSettings: () -> Unit,
+    isInstallPermissionGranted: Boolean,
+    onOpenInstallSettings: () -> Unit,
     onLockNow: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -46,6 +48,8 @@ fun SettingsPermissionsScreen(
                         onOpenAccessibilitySettings = onOpenAccessibilitySettings,
                         isDeviceAdminEnabled = isDeviceAdminEnabled,
                         onOpenDeviceAdminSettings = onOpenDeviceAdminSettings,
+                        isInstallPermissionGranted = isInstallPermissionGranted,
+                        onOpenInstallSettings = onOpenInstallSettings,
                         onLockNow = onLockNow,
                     )
                 }
