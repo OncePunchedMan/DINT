@@ -1,4 +1,4 @@
-# ![app icon](./.github/readme-images/app-icon.png) Dint — Do I Need To?
+# ![app icon](./.github/readme-images/app-icon.png) Dint - Do I Need To?
 
 Do you find yourself pointlessly unlocking your phone, thinking to yourself: "Hey, why did I just do that?" That's why I created Dint. It makes you pause and asks you why you just unlocked your phone. 
 
