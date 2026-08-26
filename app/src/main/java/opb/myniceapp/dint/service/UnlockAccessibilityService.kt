@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import opb.myniceapp.dint.InterventionActivity
 import opb.myniceapp.dint.data.AppPreferences
@@ -18,6 +20,8 @@ class UnlockAccessibilityService : AccessibilityService() {
     private lateinit var repository: UnlockLogRepository
     private var screenReceiver: BroadcastReceiver? = null
     private var homePackageName: String? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var pendingCheck: Runnable? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -37,11 +41,23 @@ class UnlockAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val currentPackage = event?.packageName?.toString() ?: return
+        pendingCheck?.let(handler::removeCallbacks)
         if (currentPackage == packageName) return
         if (currentPackage == "com.android.systemui") return
         // Unlocking almost always resurfaces the home launcher first, which would otherwise
         // consume the one-shot unlock-pending flag before the user opens the app they meant to.
         if (currentPackage == homePackageName) return
+
+        // Fingerprint/biometric unlock can surface a brief intermediate system window (package
+        // name varies by OEM) before the real target app appears. Defer evaluation so a newer
+        // window-change event can supersede a stale one instead of evaluating every transient
+        // window as it arrives.
+        val check = Runnable { evaluateForegroundPackage(currentPackage) }
+        pendingCheck = check
+        handler.postDelayed(check, SETTLE_DELAY_MILLIS)
+    }
+
+    private fun evaluateForegroundPackage(currentPackage: String) {
         if (preferences.isExcludedPackage(currentPackage)) return
         if (!preferences.hasUnlockPending()) return
         if (!preferences.isInterventionAllowedNow()) {
@@ -62,6 +78,7 @@ class UnlockAccessibilityService : AccessibilityService() {
         if (activeInstance === this) {
             activeInstance = null
         }
+        handler.removeCallbacksAndMessages(null)
         screenReceiver?.let(::unregisterReceiver)
         screenReceiver = null
         super.onDestroy()
@@ -92,6 +109,7 @@ class UnlockAccessibilityService : AccessibilityService() {
     companion object {
         @Volatile
         private var activeInstance: UnlockAccessibilityService? = null
+        private const val SETTLE_DELAY_MILLIS = 350L
 
         fun tryLockScreen(): Boolean {
             val service = activeInstance ?: return false
