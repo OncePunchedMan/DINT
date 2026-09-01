@@ -41,8 +41,10 @@ class UnlockAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val currentPackage = event?.packageName?.toString() ?: return
-        pendingCheck?.let(handler::removeCallbacks)
         if (currentPackage == packageName) return
+        // Systemui fires plenty of window-state events (status bar/notification-shade updates)
+        // that don't represent a real foreground change. Filter these out *before* touching
+        // pendingCheck, so they can't cancel an already-scheduled check for a real target app.
         if (currentPackage == "com.android.systemui") return
         // Unlocking almost always resurfaces the home launcher first, which would otherwise
         // consume the one-shot unlock-pending flag before the user opens the app they meant to.
@@ -52,13 +54,20 @@ class UnlockAccessibilityService : AccessibilityService() {
         // name varies by OEM) before the real target app appears. Defer evaluation so a newer
         // window-change event can supersede a stale one instead of evaluating every transient
         // window as it arrives.
+        pendingCheck?.let(handler::removeCallbacks)
         val check = Runnable { evaluateForegroundPackage(currentPackage) }
         pendingCheck = check
         handler.postDelayed(check, SETTLE_DELAY_MILLIS)
     }
 
     private fun evaluateForegroundPackage(currentPackage: String) {
-        if (preferences.isExcludedPackage(currentPackage)) return
+        if (preferences.isExcludedPackage(currentPackage)) {
+            // Landing on an excluded app (e.g. a push-approval authenticator opened via
+            // notification) consumes this unlock, so nothing later in the approval flow
+            // can retroactively trigger the intervention off the same unlock event.
+            preferences.clearUnlockPending()
+            return
+        }
         if (!preferences.hasUnlockPending()) return
         if (!preferences.isInterventionAllowedNow()) {
             preferences.clearUnlockPending()
