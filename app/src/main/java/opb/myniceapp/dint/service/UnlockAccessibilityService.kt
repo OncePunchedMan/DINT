@@ -22,6 +22,10 @@ class UnlockAccessibilityService : AccessibilityService() {
     private var homePackageName: String? = null
     private val handler = Handler(Looper.getMainLooper())
     private var pendingCheck: Runnable? = null
+    // Last real foreground package we observed, updated immediately (not debounced) so the
+    // ACTION_USER_PRESENT handler can consult it synchronously instead of racing the
+    // debounced window evaluation.
+    private var lastForegroundPackage: String? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -46,6 +50,12 @@ class UnlockAccessibilityService : AccessibilityService() {
         // that don't represent a real foreground change. Filter these out *before* touching
         // pendingCheck, so they can't cancel an already-scheduled check for a real target app.
         if (currentPackage == "com.android.systemui") return
+
+        // Record every real foreground change (home included) right away, so the unlock
+        // broadcast can check "are we already sitting in an excluded app?" without depending
+        // on whether the debounced evaluation below has run yet.
+        lastForegroundPackage = currentPackage
+
         // Unlocking almost always resurfaces the home launcher first, which would otherwise
         // consume the one-shot unlock-pending flag before the user opens the app they meant to.
         if (currentPackage == homePackageName) return
@@ -97,7 +107,17 @@ class UnlockAccessibilityService : AccessibilityService() {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
-                    Intent.ACTION_USER_PRESENT -> preferences.markUnlockPending()
+                    Intent.ACTION_USER_PRESENT -> {
+                        // If we're already in an excluded app when the unlock lands (e.g. a
+                        // notification-tap fingerprint unlock straight into an authenticator,
+                        // whose window event beat this broadcast), don't arm the pending flag
+                        // -- otherwise it lingers and fires on the next app the user opens.
+                        if (lastForegroundPackage?.let(preferences::isExcludedPackage) == true) {
+                            preferences.clearUnlockPending()
+                        } else {
+                            preferences.markUnlockPending()
+                        }
+                    }
                     Intent.ACTION_SCREEN_OFF -> {
                         preferences.clearUnlockPending()
                         RepositoryScope.launch { repository.clearPendingLog() }
